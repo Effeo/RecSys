@@ -1,0 +1,29 @@
+name: ludovica_compose
+version: "3.8"
+
+services:
+  ludovica_fe:
+    image: ludovica_fe
+    container_name: ludovica_fe
+    ports:
+      - "8057:8057"
+    stdin_open: true
+    tty: true
+
+  ludovica_be:
+    image: ludovica_be
+    container_name: ludovica_be
+    ports:
+      - "8058:8058"
+    volumes:
+      - ./be:/app
+      - /data/actai/pdf:/data
+    env_file:
+      - .env
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 0
+              capabilities: [ gpu ]
