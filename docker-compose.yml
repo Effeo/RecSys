@@ -1,0 +1,21 @@
+name: recsys
+version: "1.0"
+
+services:
+  recsys_fe:
+    image: recsys_fe
+    container_name: recsys_fe
+    ports:
+      - "8057:8057"
+    stdin_open: true
+    tty: true
+
+  recsys_be:
+    image: recsys_be
+    container_name: recsys_be
+    ports:
+      - "8058:8058"
+    volumes:
+      - ./backend:/app
+      - ./data:/data
+      

@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import '../models/movie.dart';
 
 class ApiClient {
-  static const String baseUrl = 'http://127.0.0.1:8000';
+  static const String baseUrl = 'http://127.0.0.1:8058';
 
   static Future<List<String>> fetchUserIds() async {
     final res = await http.get(Uri.parse('$baseUrl/users'));
