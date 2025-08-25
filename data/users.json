@@ -1,0 +1,53 @@
+{
+    "utente_1": {
+        "min_release_year": 1990,
+        "generi_desiderati": [
+            "Action",
+            "Thriller"
+        ],
+        "generi_vietati": [
+            "Children",
+            "Musical"
+        ],
+        "prefer_award_winning": true,
+        "preferred_runtime": 130,
+        "tolleranza_runtime": 20,
+        "favorite_directors": [
+            "Christopher Nolan",
+            "Ridley Scott"
+        ]
+    },
+    "utente_2": {
+        "min_release_year": 1985,
+        "generi_desiderati": [
+            "Comedy",
+            "Romance",
+            "Drama"
+        ],
+        "generi_vietati": [
+            "Horror",
+            "Sci_fi"
+        ],
+        "prefer_award_winning": false,
+        "preferred_runtime": 105,
+        "tolleranza_runtime": 15,
+        "favorite_directors": [
+            "Nora Ephron"
+        ]
+    },
+    "utente_3": {
+        "min_release_year": 1980,
+        "generi_desiderati": [
+            "Animation",
+            "Children"
+        ],
+        "generi_vietati": [
+            "Crime",
+            "Film_noir"
+        ],
+        "prefer_award_winning": true,
+        "preferred_runtime": null,
+        "tolleranza_runtime": 0,
+        "favorite_directors": []
+    }
+}
