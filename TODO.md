@@ -1,8 +1,8 @@
 # Obiettivi importanti
 
-- **Metriche**: nella traccia viene data molta importanza alle metriche da utilizzare per valutare il nostro sistema di raccomandazione. Vedere cosa ha fatto Giulia può essere utile.
+- **MAB UI**: aggiungere una sezione per mostrare il MAB.
 
-- **Docker**: due container un compose per backend e frontend.
+- **Metriche**: nella traccia viene data molta importanza alle metriche da utilizzare per valutare il nostro sistema di raccomandazione. Vedere cosa ha fatto Giulia può essere utile.
 
 # Obiettivi medio importanti
 Valutare se ha senso farlo o no
@@ -10,6 +10,8 @@ Valutare se ha senso farlo o no
 - Aggiungere una pagina modifica profilo per cambiare le preferenze dell'utente. Di conseguenza se viene data questa possibilità dobbiamo eseguire il codice di precompute ad ogni avvio del backend o periodicamente.
 
 - Aggiungere pagina per creare un nuovo profilo. Situazione simile alla pagina modifica profilo.
+
+- Valutare se modificare l'arricchimento del dataset.
 
 # Fix e Aggiunte
 Qui ci sono dei piccoli miglioramenti che si possono fare ma sono di minor importanza.
