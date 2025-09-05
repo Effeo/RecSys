@@ -38,6 +38,35 @@ class ApiClient {
     return list.map((e) => Movie.fromJson(e)).toList();
   }
 
+  // ===== NUOVO: Bandit (ritorna (exploit, explore)) =====
+  static Future<(List<Movie>, List<Movie>)> fetchBandit(
+    String userId, {
+    int topK = 16,
+    double epsilon = 0.35,
+    int candidatePool = 140,
+    int exploreExtra = 400,
+    int? seed,
+  }) async {
+    final uri = Uri.parse(
+      '$baseUrl/recommendations_bandit/$userId'
+      '?top_k=$topK&epsilon=$epsilon&candidate_pool=$candidatePool&explore_extra=$exploreExtra'
+      '${seed != null ? '&seed=$seed' : ''}',
+    );
+
+    final res = await http.get(uri);
+    if (res.statusCode != 200) throw Exception('Errore backend: ${res.statusCode}');
+    final data = jsonDecode(res.body);
+    if (data['status'] == 'no_match') return (<Movie>[], <Movie>[]);
+
+    final List raw = data['results'] ?? [];
+    final movies = raw.map((e) => Movie.fromJson(e)).toList();
+
+    final explore = movies.where((m) => m.pickStrategy == 'explore').toList();
+    final exploit = movies.where((m) => m.pickStrategy == 'exploit').toList();
+
+    return (exploit, explore);
+  }
+
   // opzionale: invio rating (predisposto)
   static Future<bool> submitRating({
     required String userId,
@@ -48,7 +77,6 @@ class ApiClient {
     final res = await http.post(uri,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'user_id': userId, 'movie_id': movieId, 'rating': rating}));
-    // se l'endpoint non esiste ancora, consideriamo comunque ok lato UI
     return res.statusCode == 200 || res.statusCode == 404;
   }
 }

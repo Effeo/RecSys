@@ -20,5 +20,13 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/profile_placeholder.jpg
-    - assets/poster_placeholder.jpg
+    - assets/posters/poster1.jpg
+    - assets/posters/poster2.jpg
+    - assets/posters/poster3.jpg
+    - assets/posters/poster4.jpg
+    - assets/posters/poster5.jpg
+    - assets/avatars/avatar1.jpg
+    - assets/avatars/avatar2.jpg
+    - assets/avatars/avatar3.jpg
+    - assets/avatars/avatar4.jpg
+    - assets/avatars/avatar5.jpg

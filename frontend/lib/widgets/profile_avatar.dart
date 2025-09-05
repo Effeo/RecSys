@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:rec_movies_frontend/utils/asset_picker.dart';
 
 class ProfileAvatar extends StatelessWidget {
   final String label;
@@ -16,23 +17,23 @@ class ProfileAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final avatar = Container(
-      width: 120,
-      height: 120,
-      decoration: BoxDecoration(
-        color: isAddButton ? Colors.black54 : Colors.grey.shade800,
-        borderRadius: BorderRadius.circular(8),
-        image: isAddButton
-            ? null
-            : DecorationImage(
-                // Placeholder “poster profile” astratto
-                image: const AssetImage('assets/profile_placeholder.jpg'),
-                fit: BoxFit.cover,
+    final avatarBox = ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: 120,
+        height: 120,
+        color: Colors.grey.shade800,
+        alignment: Alignment.center,
+        child: isAddButton
+            ? const Icon(Icons.add, size: 48, color: Colors.white70)
+            : Image.asset(
+                AssetPicker.avatarForUser(label),
+                width: 120,
+                height: 120,
+                fit: BoxFit.scaleDown, // << riduce se non entra
+                errorBuilder: (ctx, _, __) => const _AvatarFallback(),
               ),
       ),
-      child: isAddButton
-          ? const Icon(Icons.add, size: 48, color: Colors.white70)
-          : null,
     );
 
     return InkWell(
@@ -43,7 +44,7 @@ class ProfileAvatar extends StatelessWidget {
         children: [
           Stack(
             children: [
-              avatar,
+              avatarBox,
               if (!isAddButton && onEdit != null)
                 Positioned(
                   right: 6,
@@ -77,6 +78,20 @@ class ProfileAvatar extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _AvatarFallback extends StatelessWidget {
+  const _AvatarFallback();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 120,
+      height: 120,
+      color: Colors.black54,
+      alignment: Alignment.center,
+      child: const Icon(Icons.person, size: 42, color: Colors.white38),
     );
   }
 }

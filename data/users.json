@@ -1,5 +1,5 @@
 {
-    "utente_1": {
+    "Francesco": {
         "min_release_year": 1990,
         "generi_desiderati": [
             "Action",
@@ -17,7 +17,7 @@
             "Ridley Scott"
         ]
     },
-    "utente_2": {
+    "Gianmarco": {
         "min_release_year": 1985,
         "generi_desiderati": [
             "Comedy",
@@ -35,7 +35,7 @@
             "Nora Ephron"
         ]
     },
-    "utente_3": {
+    "Ulderico": {
         "min_release_year": 1980,
         "generi_desiderati": [
             "Animation",

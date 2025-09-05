@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:rec_movies_frontend/utils/asset_picker.dart';
 import '../models/movie.dart';
 
 class MovieCard extends StatelessWidget {
@@ -16,19 +17,24 @@ class MovieCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Poster
+            // Poster (16:9) con riduzione se non entra
             AspectRatio(
               aspectRatio: 16 / 9,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(6),
-                child: Image.asset(
-                  'assets/poster_placeholder.jpg',
-                  fit: BoxFit.cover,
+                child: Container(
+                  color: const Color(0xFF1B1B1B),
+                  alignment: Alignment.center,
+                  child: Image.asset(
+                    AssetPicker.posterForMovie(movie),
+                    fit:
+                        BoxFit.scaleDown, // << riduce se troppo grande, no crop
+                    errorBuilder: (ctx, _, __) => _PosterFallback(),
+                  ),
                 ),
               ),
             ),
             const SizedBox(height: 8),
-            // Titolo
             Text(
               movie.title,
               maxLines: 1,
@@ -39,7 +45,6 @@ class MovieCard extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            // Punteggio (se presente)
             if (movie.score != null || movie.similarity != null)
               Text(
                 movie.score != null
@@ -50,6 +55,17 @@ class MovieCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PosterFallback extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFF2A2A2A),
+      alignment: Alignment.center,
+      child: const Icon(Icons.local_movies, color: Colors.white38, size: 28),
     );
   }
 }
