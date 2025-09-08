@@ -42,31 +42,7 @@ class ProfileAvatar extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Stack(
-            children: [
-              avatarBox,
-              if (!isAddButton && onEdit != null)
-                Positioned(
-                  right: 6,
-                  top: 6,
-                  child: InkWell(
-                    onTap: onEdit,
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.black54,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: const Icon(
-                        Icons.edit,
-                        size: 18,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
+          Stack(children: [avatarBox]),
           const SizedBox(height: 10),
           Text(
             label,

@@ -7,7 +7,9 @@ class ApiClient {
 
   static Future<List<String>> fetchUserIds() async {
     final res = await http.get(Uri.parse('$baseUrl/users'));
-    if (res.statusCode != 200) throw Exception('Errore backend: ${res.statusCode}');
+    if (res.statusCode != 200) {
+      throw Exception('Errore backend: ${res.statusCode}');
+    }
     final data = jsonDecode(res.body);
     final users = data['users'];
     if (users is List) {
@@ -20,9 +22,24 @@ class ApiClient {
     return <String>[];
   }
 
+  // 🔹 NUOVO: recupera preferenze (per leggere liked_movie)
+  static Future<Map<String, dynamic>> fetchUserPreferences(String userId) async {
+    final res = await http.get(Uri.parse('$baseUrl/users/$userId'));
+    if (res.statusCode != 200) {
+      throw Exception('Errore backend: ${res.statusCode}');
+    }
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    // backend risponde con {"status":"ok","user_id":"...","preferences":{...}}
+    return (data['preferences'] as Map<String, dynamic>? ?? <String, dynamic>{});
+  }
+
   static Future<List<Movie>> fetchRecommendations(String userId) async {
-    final res = await http.get(Uri.parse('$baseUrl/recommendations/$userId?top_k=20'));
-    if (res.statusCode != 200) throw Exception('Errore backend: ${res.statusCode}');
+    final res = await http.get(
+      Uri.parse('$baseUrl/recommendations/$userId?top_k=20'),
+    );
+    if (res.statusCode != 200) {
+      throw Exception('Errore backend: ${res.statusCode}');
+    }
     final data = jsonDecode(res.body);
     if (data['status'] == 'no_match') return [];
     final List list = data['results'] ?? [];
@@ -30,15 +47,21 @@ class ApiClient {
   }
 
   static Future<List<Movie>> fetchSimilar(String title) async {
-    final res = await http.get(Uri.parse('$baseUrl/similar_movies/$title?top_k=20'));
-    if (res.statusCode != 200) throw Exception('Errore backend: ${res.statusCode}');
+    // URL-encode del titolo (spazi, caratteri speciali)
+    final encodedTitle = Uri.encodeComponent(title);
+    final res = await http.get(
+      Uri.parse('$baseUrl/similar_movies/$encodedTitle?top_k=20'),
+    );
+    if (res.statusCode != 200) {
+      throw Exception('Errore backend: ${res.statusCode}');
+    }
     final data = jsonDecode(res.body);
     if (data['status'] == 'no_match') return [];
     final List list = data['results'] ?? [];
     return list.map((e) => Movie.fromJson(e)).toList();
   }
 
-  // ===== NUOVO: Bandit (ritorna (exploit, explore)) =====
+  // ===== Bandit (ritorna (exploit, explore)) =====
   static Future<(List<Movie>, List<Movie>)> fetchBandit(
     String userId, {
     int topK = 16,
@@ -54,7 +77,9 @@ class ApiClient {
     );
 
     final res = await http.get(uri);
-    if (res.statusCode != 200) throw Exception('Errore backend: ${res.statusCode}');
+    if (res.statusCode != 200) {
+      throw Exception('Errore backend: ${res.statusCode}');
+    }
     final data = jsonDecode(res.body);
     if (data['status'] == 'no_match') return (<Movie>[], <Movie>[]);
 
@@ -67,16 +92,21 @@ class ApiClient {
     return (exploit, explore);
   }
 
-  // opzionale: invio rating (predisposto)
-  static Future<bool> submitRating({
-    required String userId,
-    required int movieId,
-    required int rating, // 1..5
-  }) async {
-    final uri = Uri.parse('$baseUrl/rate');
-    final res = await http.post(uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'user_id': userId, 'movie_id': movieId, 'rating': rating}));
-    return res.statusCode == 200 || res.statusCode == 404;
+  static Future<void> createOrUpdateUser(
+    String userId,
+    Map<String, dynamic> prefs,
+  ) async {
+    // upsert lato backend
+    final uri = Uri.parse('$baseUrl/users/$userId');
+    final r = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(prefs),
+    );
+    if (r.statusCode != 200) {
+      throw Exception(
+        'Errore creazione/aggiornamento utente: HTTP ${r.statusCode} — ${r.body}',
+      );
+    }
   }
 }

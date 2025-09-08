@@ -13,8 +13,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  // Ora carichiamo: recs, similar, banditExploit, banditExplore
-  late Future<(List<Movie>, List<Movie>, List<Movie>, List<Movie>)> _futureData;
+  // Ora carichiamo: likedTitle, recs, similar, banditExploit, banditExplore
+  late Future<(String, List<Movie>, List<Movie>, List<Movie>, List<Movie>)> _futureData;
 
   @override
   void initState() {
@@ -22,10 +22,16 @@ class _HomePageState extends State<HomePage> {
     _futureData = _load();
   }
 
-  Future<(List<Movie>, List<Movie>, List<Movie>, List<Movie>)> _load() async {
-    final recs = await ApiClient.fetchRecommendations(widget.userId);
-    final similar = await ApiClient.fetchSimilar('Toy Story'); // placeholder X
-    final (banditExploit, banditExplore) = await ApiClient.fetchBandit(
+  Future<(String, List<Movie>, List<Movie>, List<Movie>, List<Movie>)> _load() async {
+    // 1) preferenze utente per ricavare liked_movie
+    final prefs = await ApiClient.fetchUserPreferences(widget.userId);
+    final likedTitle = (prefs['liked_movie'] as String?)?.trim();
+    final seedTitle = (likedTitle == null || likedTitle.isEmpty) ? 'Toy Story' : likedTitle;
+
+    // 2) chiamate in parallelo
+    final recsF = ApiClient.fetchRecommendations(widget.userId);
+    final similarF = ApiClient.fetchSimilar(seedTitle);
+    final banditF = ApiClient.fetchBandit(
       widget.userId,
       topK: 20,
       epsilon: 0.35,
@@ -33,7 +39,12 @@ class _HomePageState extends State<HomePage> {
       exploreExtra: 400,
       seed: 42, // stabile in dev
     );
-    return (recs, similar, banditExploit, banditExplore);
+
+    final recs = await recsF;
+    final similar = await similarF;
+    final (banditExploit, banditExplore) = await banditF;
+
+    return (seedTitle, recs, similar, banditExploit, banditExplore);
   }
 
   void _openDetails(Movie m) {
@@ -64,95 +75,93 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: bg,
       body: SafeArea(
-        child:
-            FutureBuilder<(List<Movie>, List<Movie>, List<Movie>, List<Movie>)>(
-              future: _futureData,
-              builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: Colors.redAccent),
-                  );
-                }
-                if (snap.hasError) {
-                  return Center(
-                    child: Text(
-                      'Errore: ${snap.error}',
-                      style: const TextStyle(color: Colors.redAccent),
-                    ),
-                  );
-                }
-                final (recs, similar, banditExploit, banditExplore) =
-                    snap.data ?? (<Movie>[], <Movie>[], <Movie>[], <Movie>[]);
+        child: FutureBuilder<(String, List<Movie>, List<Movie>, List<Movie>, List<Movie>)>(
+          future: _futureData,
+          builder: (context, snap) {
+            if (snap.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: CircularProgressIndicator(color: Colors.redAccent),
+              );
+            }
+            if (snap.hasError) {
+              return Center(
+                child: Text(
+                  'Errore: ${snap.error}',
+                  style: const TextStyle(color: Colors.redAccent),
+                ),
+              );
+            }
+            final (likedTitle, recs, similar, banditExploit, banditExplore) =
+                snap.data ?? ('Toy Story', <Movie>[], <Movie>[], <Movie>[], <Movie>[]);
 
-                return ListView(
-                  padding: EdgeInsets.zero,
-                  children: [
-                    // HEADER HERO
-                    Container(
-                      height: 140,
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [Color(0xFF1A1A1A), Color(0xFF0E0E0E)],
+            return ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                // HEADER HERO
+                Container(
+                  height: 140,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF1A1A1A), Color(0xFF0E0E0E)],
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Benvenuto, ${widget.userId}', style: titleStyle),
+                        const SizedBox(height: 8),
+                        Text(
+                          likedTitle.isNotEmpty
+                              ? 'Consigli basati anche su: $likedTitle'
+                              : 'Scopri titoli su misura e novità',
+                          style: subtitleStyle,
                         ),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Benvenuto, ${widget.userId}',
-                              style: titleStyle,
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Scopri titoli su misura e novità',
-                              style: subtitleStyle,
-                            ),
-                          ],
-                        ),
-                      ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
+                  ),
+                ),
+                const SizedBox(height: 8),
 
-                    // baseline
-                    SectionRow(
-                      title: 'Consigliati per te',
-                      titleStyle: sectionTitleStyle,
-                      movies: recs,
-                      onTapMovie: _openDetails,
-                      showArrows: true,
-                      showExploreBadge: true, // innocuo (nessuno è explore qui)
-                    ),
+                // baseline
+                SectionRow(
+                  title: 'Consigliati per te',
+                  titleStyle: sectionTitleStyle,
+                  movies: recs,
+                  onTapMovie: _openDetails,
+                  showArrows: true,
+                  showExploreBadge: true, // innocuo (nessuno è explore qui)
+                ),
 
-                    // similar by title
-                    SectionRow(
-                      title: 'Perché ti piace Toy Story',
-                      titleStyle: sectionTitleStyle,
-                      movies: similar,
-                      onTapMovie: _openDetails,
-                      showArrows: true,
-                    ),
+                // similar by dynamic title
+                SectionRow(
+                  title: 'Perché ti piace $likedTitle',
+                  titleStyle: sectionTitleStyle,
+                  movies: similar,
+                  onTapMovie: _openDetails,
+                  showArrows: true,
+                ),
 
-                    // ====== SEZIONI BANDIT ======
-                    const SizedBox(height: 8),
-                    SectionRow(
-                      title: 'Esplora (novità)',
-                      titleStyle: sectionTitleStyle,
-                      accentColor: const Color(0xFFE50914), // rosso Netflix
-                      movies: banditExplore,
-                      onTapMovie: _openDetails,
-                      showArrows: true,
-                      showExploreBadge: true, // badge “NOVITÀ” sugli explore
-                    ),
+                // ====== SEZIONE BANDIT (esplorazione) ======
+                const SizedBox(height: 8),
+                SectionRow(
+                  title: 'Esplora (novità)',
+                  titleStyle: sectionTitleStyle,
+                  accentColor: const Color(0xFFE50914), // rosso Netflix
+                  movies: banditExplore,
+                  onTapMovie: _openDetails,
+                  showArrows: true,
+                  showExploreBadge: true, // badge “NOVITÀ” sugli explore
+                ),
 
-                    const SizedBox(height: 28),
-                  ],
-                );
-              },
-            ),
+                const SizedBox(height: 28),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

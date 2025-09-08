@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:rec_movies_frontend/utils/asset_picker.dart';
 import '../models/movie.dart';
-import '../services/api_client.dart';
 
 class MovieDetailSheet extends StatefulWidget {
   final Movie movie;
@@ -42,9 +41,6 @@ class _DetailPosterFallback extends StatelessWidget {
 }
 
 class _MovieDetailSheetState extends State<MovieDetailSheet> {
-  int _rating = 0;
-  bool _submitting = false;
-
   @override
   Widget build(BuildContext context) {
     final m = widget.movie;
@@ -138,93 +134,6 @@ class _MovieDetailSheetState extends State<MovieDetailSheet> {
                                 ),
                               ),
                             const SizedBox(height: 24),
-
-                            // Rating
-                            const Text(
-                              'Valuta questo titolo',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: List.generate(5, (i) {
-                                final idx = i + 1;
-                                final filled = _rating >= idx;
-                                return IconButton(
-                                  onPressed: () =>
-                                      setState(() => _rating = idx),
-                                  icon: Icon(
-                                    filled ? Icons.star : Icons.star_border,
-                                    color: filled
-                                        ? Colors.amber
-                                        : Colors.white70,
-                                    size: 28,
-                                  ),
-                                );
-                              }),
-                            ),
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              height: 44,
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFE50914),
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                                onPressed:
-                                    (_rating == 0 ||
-                                        m.movieId == null ||
-                                        _submitting)
-                                    ? null
-                                    : () async {
-                                        setState(() => _submitting = true);
-                                        final ok = await ApiClient.submitRating(
-                                          userId: widget.userId,
-                                          movieId: m.movieId!,
-                                          rating: _rating,
-                                        );
-                                        if (!mounted) return;
-                                        setState(() => _submitting = false);
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              ok
-                                                  ? 'Voto inviato'
-                                                  : 'Impossibile inviare il voto',
-                                            ),
-                                            backgroundColor: ok
-                                                ? Colors.green
-                                                : Colors.red,
-                                          ),
-                                        );
-                                      },
-                                child: _submitting
-                                    ? const SizedBox(
-                                        height: 18,
-                                        width: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                    : const Text(
-                                        'Invia voto',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: 0.2,
-                                        ),
-                                      ),
-                              ),
-                            ),
-                            const SizedBox(height: 40),
                           ],
                         ),
                       ),

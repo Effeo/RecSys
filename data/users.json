@@ -1,53 +1,197 @@
 {
-    "Francesco": {
-        "min_release_year": 1990,
-        "generi_desiderati": [
-            "Action",
-            "Thriller"
-        ],
-        "generi_vietati": [
-            "Children",
-            "Musical"
-        ],
-        "prefer_award_winning": true,
-        "preferred_runtime": 130,
-        "tolleranza_runtime": 20,
-        "favorite_directors": [
-            "Christopher Nolan",
-            "Ridley Scott"
-        ]
-    },
-    "Gianmarco": {
-        "min_release_year": 1985,
-        "generi_desiderati": [
-            "Comedy",
-            "Romance",
-            "Drama"
-        ],
-        "generi_vietati": [
-            "Horror",
-            "Sci_fi"
-        ],
-        "prefer_award_winning": false,
-        "preferred_runtime": 105,
-        "tolleranza_runtime": 15,
-        "favorite_directors": [
-            "Nora Ephron"
-        ]
-    },
-    "Ulderico": {
-        "min_release_year": 1980,
-        "generi_desiderati": [
-            "Animation",
-            "Children"
-        ],
-        "generi_vietati": [
-            "Crime",
-            "Film_noir"
-        ],
-        "prefer_award_winning": true,
-        "preferred_runtime": null,
-        "tolleranza_runtime": 0,
-        "favorite_directors": []
-    }
+  "Francesco": {
+    "min_release_year": 1990,
+    "generi_desiderati": [
+      "Action",
+      "Thriller"
+    ],
+    "generi_vietati": [
+      "Children",
+      "Musical"
+    ],
+    "prefer_award_winning": true,
+    "preferred_runtime": 130,
+    "tolleranza_runtime": 20,
+    "favorite_directors": [
+      "Ridley Scott",
+      "James Cameron"
+    ],
+    "liked_movie": "Toy Story"
+  },
+  "Gianmarco": {
+    "min_release_year": 1985,
+    "generi_desiderati": [
+      "Comedy",
+      "Romance",
+      "Drama"
+    ],
+    "generi_vietati": [
+      "Horror",
+      "Sci_fi"
+    ],
+    "prefer_award_winning": false,
+    "preferred_runtime": 105,
+    "tolleranza_runtime": 15,
+    "favorite_directors": [
+      "Nora Ephron"
+    ],
+    "liked_movie": "GoldenEye"
+  },
+  "Ulderico": {
+    "min_release_year": 1980,
+    "generi_desiderati": [
+      "Animation",
+      "Children"
+    ],
+    "generi_vietati": [
+      "Crime",
+      "Film_noir"
+    ],
+    "prefer_award_winning": true,
+    "preferred_runtime": null,
+    "tolleranza_runtime": 0,
+    "favorite_directors": [
+      "John Lasseter",
+      "Henry Selick"
+    ],
+    "liked_movie": "Four Rooms"
+  },
+  "Sara": {
+    "min_release_year": 1990,
+    "generi_desiderati": [
+      "Drama",
+      "Romance"
+    ],
+    "generi_vietati": [
+      "Horror",
+      "Sci_fi"
+    ],
+    "prefer_award_winning": true,
+    "preferred_runtime": 110,
+    "tolleranza_runtime": 20,
+    "favorite_directors": [
+      "Nora Ephron",
+      "James Ivory",
+      "Wong Kar-wai"
+    ],
+    "liked_movie": "Billy Madison"
+  },
+  "Luca": {
+    "min_release_year": 1988,
+    "generi_desiderati": [
+      "Action",
+      "Sci_fi"
+    ],
+    "generi_vietati": [
+      "Musical",
+      "Documentary"
+    ],
+    "prefer_award_winning": false,
+    "preferred_runtime": 125,
+    "tolleranza_runtime": 25,
+    "favorite_directors": [
+      "James Cameron",
+      "John McTiernan",
+      "Paul Verhoeven"
+    ],
+    "liked_movie": "Clerks"
+  },
+  "Elena": {
+    "min_release_year": 1992,
+    "generi_desiderati": [
+      "Comedy",
+      "Children"
+    ],
+    "generi_vietati": [
+      "Crime",
+      "Horror"
+    ],
+    "prefer_award_winning": false,
+    "preferred_runtime": 95,
+    "tolleranza_runtime": 15,
+    "favorite_directors": [
+      "Chris Columbus (filmmaker)",
+      "Penny Marshall",
+      "Ivan Reitman"
+    ],
+    "liked_movie": "Dolores Claiborne"
+  },
+  "Marco": {
+    "min_release_year": 1985,
+    "generi_desiderati": [
+      "Thriller",
+      "Crime"
+    ],
+    "generi_vietati": [
+      "Children",
+      "Musical"
+    ],
+    "prefer_award_winning": true,
+    "preferred_runtime": 120,
+    "tolleranza_runtime": 15,
+    "favorite_directors": [
+      "David Fincher",
+      "Michael Mann",
+      "Brian De Palma"
+    ],
+    "liked_movie": "Exotica"
+  },
+  "Chiara": {
+    "min_release_year": 1980,
+    "generi_desiderati": [
+      "Animation",
+      "Fantasy"
+    ],
+    "generi_vietati": [
+      "Horror",
+      "Film_noir"
+    ],
+    "prefer_award_winning": true,
+    "preferred_runtime": 100,
+    "tolleranza_runtime": 10,
+    "favorite_directors": [
+      "John Lasseter",
+      "Henry Selick"
+    ],
+    "liked_movie": "Ed Wood"
+  },
+  "Davide": {
+    "min_release_year": 1980,
+    "generi_desiderati": [
+      "War",
+      "Drama"
+    ],
+    "generi_vietati": [
+      "Romance",
+      "Musical"
+    ],
+    "prefer_award_winning": true,
+    "preferred_runtime": 130,
+    "tolleranza_runtime": 20,
+    "favorite_directors": [
+      "Steven Spielberg",
+      "Clint Eastwood"
+    ],
+    "liked_movie": "Legends of the Fall"
+  },
+  "Alessia": {
+    "min_release_year": 1985,
+    "generi_desiderati": [
+      "Documentary",
+      "Drama"
+    ],
+    "generi_vietati": [
+      "Action",
+      "Horror"
+    ],
+    "prefer_award_winning": true,
+    "preferred_runtime": 105,
+    "tolleranza_runtime": 20,
+    "favorite_directors": [
+      "Agnieszka Holland",
+      "Wim Wenders",
+      "Jane Campion"
+    ],
+    "liked_movie": "Stargate"
+  }
 }

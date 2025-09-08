@@ -1,0 +1,687 @@
+{
+  "per_user": [
+    {
+      "user_id": "Alessia",
+      "method": "constraint",
+      "n": 10,
+      "accuracy": 0.7,
+      "partial_accuracy": 1.0,
+      "ild": 0.5379365079365079,
+      "diversity": 0.5379365079365079,
+      "serendipity": 0.0,
+      "precision@k": 1.0,
+      "recall@k": 0.0,
+      "ndcg@k": 1.0,
+      "movie_ids": [
+        1260,
+        882,
+        512,
+        1635,
+        1561,
+        1366,
+        847,
+        37,
+        914,
+        1603
+      ]
+    },
+    {
+      "user_id": "Alessia",
+      "method": "bandit",
+      "n": 10,
+      "accuracy": 0.5,
+      "partial_accuracy": 0.5,
+      "ild": 0.7981481481481482,
+      "diversity": 0.7981481481481482,
+      "serendipity": 0.5,
+      "precision@k": 0.5,
+      "recall@k": 0.0,
+      "ndcg@k": 0.6988985338056923,
+      "movie_ids": [
+        1260,
+        1503,
+        354,
+        860,
+        882,
+        512,
+        1635,
+        718,
+        1561,
+        1162
+      ],
+      "bandit_meta": {
+        "epsilon": 0.35,
+        "exploit_pool_size": 160,
+        "explore_pool_size": 733,
+        "explore_ratio": 0.5,
+        "novel_count": null
+      }
+    },
+    {
+      "user_id": "Chiara",
+      "method": "constraint",
+      "n": 10,
+      "accuracy": 0.4,
+      "partial_accuracy": 1.0,
+      "ild": 0.688941798941799,
+      "diversity": 0.688941798941799,
+      "serendipity": 0.0,
+      "precision@k": 1.0,
+      "recall@k": 0.0,
+      "ndcg@k": 1.0,
+      "movie_ids": [
+        473,
+        1,
+        820,
+        1076,
+        832,
+        892,
+        1367,
+        1615,
+        71,
+        472
+      ]
+    },
+    {
+      "user_id": "Chiara",
+      "method": "bandit",
+      "n": 10,
+      "accuracy": 0.4,
+      "partial_accuracy": 0.5,
+      "ild": 0.8698941798941799,
+      "diversity": 0.8698941798941799,
+      "serendipity": 0.5,
+      "precision@k": 0.5,
+      "recall@k": 0.0,
+      "ndcg@k": 0.6988985338056923,
+      "movie_ids": [
+        473,
+        529,
+        800,
+        719,
+        1,
+        820,
+        1076,
+        1638,
+        832,
+        1259
+      ],
+      "bandit_meta": {
+        "epsilon": 0.35,
+        "exploit_pool_size": 160,
+        "explore_pool_size": 1294,
+        "explore_ratio": 0.5,
+        "novel_count": null
+      }
+    },
+    {
+      "user_id": "Davide",
+      "method": "constraint",
+      "n": 10,
+      "accuracy": 1.0,
+      "partial_accuracy": 1.0,
+      "ild": 0.30407407407407405,
+      "diversity": 0.30407407407407405,
+      "serendipity": 0.0,
+      "precision@k": 1.0,
+      "recall@k": 0.0,
+      "ndcg@k": 1.0,
+      "movie_ids": [
+        318,
+        31,
+        744,
+        190,
+        157,
+        651,
+        647,
+        750,
+        10,
+        944
+      ]
+    },
+    {
+      "user_id": "Davide",
+      "method": "bandit",
+      "n": 10,
+      "accuracy": 0.5,
+      "partial_accuracy": 0.5,
+      "ild": 0.7814814814814814,
+      "diversity": 0.7814814814814814,
+      "serendipity": 0.5,
+      "precision@k": 0.5,
+      "recall@k": 0.0,
+      "ndcg@k": 0.6988985338056923,
+      "movie_ids": [
+        318,
+        1239,
+        1183,
+        1206,
+        31,
+        744,
+        190,
+        1217,
+        157,
+        988
+      ],
+      "bandit_meta": {
+        "epsilon": 0.35,
+        "exploit_pool_size": 160,
+        "explore_pool_size": 783,
+        "explore_ratio": 0.5,
+        "novel_count": null
+      }
+    },
+    {
+      "user_id": "Elena",
+      "method": "constraint",
+      "n": 10,
+      "accuracy": 1.0,
+      "partial_accuracy": 1.0,
+      "ild": 0.447037037037037,
+      "diversity": 0.447037037037037,
+      "serendipity": 0.0,
+      "precision@k": 1.0,
+      "recall@k": 0.0,
+      "ndcg@k": 1.0,
+      "movie_ids": [
+        8,
+        929,
+        892,
+        1023,
+        225,
+        795,
+        728,
+        477,
+        259,
+        732
+      ]
+    },
+    {
+      "user_id": "Elena",
+      "method": "bandit",
+      "n": 10,
+      "accuracy": 0.5,
+      "partial_accuracy": 0.5,
+      "ild": 0.8540740740740741,
+      "diversity": 0.8540740740740741,
+      "serendipity": 0.5,
+      "precision@k": 0.5,
+      "recall@k": 0.0,
+      "ndcg@k": 0.6988985338056923,
+      "movie_ids": [
+        8,
+        1087,
+        1027,
+        1171,
+        929,
+        892,
+        1023,
+        983,
+        225,
+        1363
+      ],
+      "bandit_meta": {
+        "epsilon": 0.35,
+        "exploit_pool_size": 160,
+        "explore_pool_size": 843,
+        "explore_ratio": 0.5,
+        "novel_count": null
+      }
+    },
+    {
+      "user_id": "Francesco",
+      "method": "constraint",
+      "n": 10,
+      "accuracy": 1.0,
+      "partial_accuracy": 1.0,
+      "ild": 0.48031746031746025,
+      "diversity": 0.48031746031746025,
+      "serendipity": 0.0,
+      "precision@k": 1.0,
+      "recall@k": 0.0,
+      "ndcg@k": 1.0,
+      "movie_ids": [
+        96,
+        568,
+        53,
+        28,
+        771,
+        260,
+        313,
+        572,
+        1016,
+        597
+      ]
+    },
+    {
+      "user_id": "Francesco",
+      "method": "bandit",
+      "n": 10,
+      "accuracy": 0.5,
+      "partial_accuracy": 0.5,
+      "ild": 0.7833333333333333,
+      "diversity": 0.7833333333333333,
+      "serendipity": 0.5,
+      "precision@k": 0.5,
+      "recall@k": 0.0,
+      "ndcg@k": 0.6988985338056923,
+      "movie_ids": [
+        96,
+        1022,
+        217,
+        1316,
+        568,
+        53,
+        28,
+        115,
+        771,
+        47
+      ],
+      "bandit_meta": {
+        "epsilon": 0.35,
+        "exploit_pool_size": 160,
+        "explore_pool_size": 1001,
+        "explore_ratio": 0.5,
+        "novel_count": null
+      }
+    },
+    {
+      "user_id": "Gianmarco",
+      "method": "constraint",
+      "n": 10,
+      "accuracy": 1.0,
+      "partial_accuracy": 1.0,
+      "ild": 0.11851851851851858,
+      "diversity": 0.11851851851851858,
+      "serendipity": 0.0,
+      "precision@k": 1.0,
+      "recall@k": 0.0,
+      "ndcg@k": 1.0,
+      "movie_ids": [
+        775,
+        866,
+        1424,
+        778,
+        1115,
+        1100,
+        512,
+        88,
+        692,
+        936
+      ]
+    },
+    {
+      "user_id": "Gianmarco",
+      "method": "bandit",
+      "n": 10,
+      "accuracy": 0.5,
+      "partial_accuracy": 0.5,
+      "ild": 0.7703703703703704,
+      "diversity": 0.7703703703703704,
+      "serendipity": 0.5,
+      "precision@k": 0.5,
+      "recall@k": 0.0,
+      "ndcg@k": 0.6988985338056923,
+      "movie_ids": [
+        775,
+        1419,
+        439,
+        1540,
+        866,
+        1424,
+        778,
+        1414,
+        1115,
+        374
+      ],
+      "bandit_meta": {
+        "epsilon": 0.35,
+        "exploit_pool_size": 160,
+        "explore_pool_size": 374,
+        "explore_ratio": 0.5,
+        "novel_count": null
+      }
+    },
+    {
+      "user_id": "Luca",
+      "method": "constraint",
+      "n": 10,
+      "accuracy": 1.0,
+      "partial_accuracy": 1.0,
+      "ild": 0.42666666666666664,
+      "diversity": 0.42666666666666664,
+      "serendipity": 0.0,
+      "precision@k": 1.0,
+      "recall@k": 0.0,
+      "ndcg@k": 1.0,
+      "movie_ids": [
+        271,
+        96,
+        769,
+        62,
+        1416,
+        916,
+        39,
+        578,
+        82,
+        1419
+      ]
+    },
+    {
+      "user_id": "Luca",
+      "method": "bandit",
+      "n": 10,
+      "accuracy": 0.5,
+      "partial_accuracy": 0.5,
+      "ild": 0.7966666666666666,
+      "diversity": 0.7966666666666666,
+      "serendipity": 0.5,
+      "precision@k": 0.5,
+      "recall@k": 0.0,
+      "ndcg@k": 0.6988985338056923,
+      "movie_ids": [
+        271,
+        1643,
+        1405,
+        863,
+        96,
+        769,
+        62,
+        805,
+        1416,
+        1651
+      ],
+      "bandit_meta": {
+        "epsilon": 0.35,
+        "exploit_pool_size": 160,
+        "explore_pool_size": 1125,
+        "explore_ratio": 0.5,
+        "novel_count": null
+      }
+    },
+    {
+      "user_id": "Marco",
+      "method": "constraint",
+      "n": 10,
+      "accuracy": 1.0,
+      "partial_accuracy": 1.0,
+      "ild": 0.4937566137566137,
+      "diversity": 0.4937566137566137,
+      "serendipity": 0.0,
+      "precision@k": 1.0,
+      "recall@k": 0.0,
+      "ndcg@k": 1.0,
+      "movie_ids": [
+        273,
+        302,
+        823,
+        914,
+        129,
+        100,
+        5,
+        1069,
+        1139,
+        902
+      ]
+    },
+    {
+      "user_id": "Marco",
+      "method": "bandit",
+      "n": 10,
+      "accuracy": 0.5,
+      "partial_accuracy": 0.5,
+      "ild": 0.8149206349206349,
+      "diversity": 0.8149206349206349,
+      "serendipity": 0.5,
+      "precision@k": 0.5,
+      "recall@k": 0.0,
+      "ndcg@k": 0.6988985338056923,
+      "movie_ids": [
+        273,
+        1640,
+        1335,
+        816,
+        302,
+        823,
+        914,
+        643,
+        129,
+        1293
+      ],
+      "bandit_meta": {
+        "epsilon": 0.35,
+        "exploit_pool_size": 160,
+        "explore_pool_size": 1124,
+        "explore_ratio": 0.5,
+        "novel_count": null
+      }
+    },
+    {
+      "user_id": "Sara",
+      "method": "constraint",
+      "n": 10,
+      "accuracy": 1.0,
+      "partial_accuracy": 1.0,
+      "ild": 0.17481481481481487,
+      "diversity": 0.17481481481481487,
+      "serendipity": 0.0,
+      "precision@k": 1.0,
+      "recall@k": 0.0,
+      "ndcg@k": 1.0,
+      "movie_ids": [
+        1129,
+        594,
+        531,
+        714,
+        129,
+        1400,
+        283,
+        1211,
+        275,
+        736
+      ]
+    },
+    {
+      "user_id": "Sara",
+      "method": "bandit",
+      "n": 10,
+      "accuracy": 0.5,
+      "partial_accuracy": 0.5,
+      "ild": 0.8142328042328042,
+      "diversity": 0.8142328042328042,
+      "serendipity": 0.5,
+      "precision@k": 0.5,
+      "recall@k": 0.0,
+      "ndcg@k": 0.6988985338056923,
+      "movie_ids": [
+        1129,
+        1288,
+        24,
+        1496,
+        594,
+        531,
+        714,
+        103,
+        129,
+        1412
+      ],
+      "bandit_meta": {
+        "epsilon": 0.35,
+        "exploit_pool_size": 160,
+        "explore_pool_size": 630,
+        "explore_ratio": 0.5,
+        "novel_count": null
+      }
+    },
+    {
+      "user_id": "Ulderico",
+      "method": "constraint",
+      "n": 10,
+      "accuracy": 1.0,
+      "partial_accuracy": 1.0,
+      "ild": 0.45559082892416225,
+      "diversity": 0.45559082892416225,
+      "serendipity": 0.0,
+      "precision@k": 1.0,
+      "recall@k": 0.0,
+      "ndcg@k": 1.0,
+      "movie_ids": [
+        473,
+        1,
+        989,
+        993,
+        1219,
+        71,
+        1066,
+        596,
+        426,
+        1470
+      ]
+    },
+    {
+      "user_id": "Ulderico",
+      "method": "bandit",
+      "n": 10,
+      "accuracy": 0.5,
+      "partial_accuracy": 0.5,
+      "ild": 0.827962962962963,
+      "diversity": 0.827962962962963,
+      "serendipity": 0.5,
+      "precision@k": 0.5,
+      "recall@k": 0.0,
+      "ndcg@k": 0.6988985338056923,
+      "movie_ids": [
+        473,
+        1140,
+        295,
+        1282,
+        1,
+        989,
+        993,
+        1678,
+        1219,
+        164
+      ],
+      "bandit_meta": {
+        "epsilon": 0.35,
+        "exploit_pool_size": 160,
+        "explore_pool_size": 1295,
+        "explore_ratio": 0.5,
+        "novel_count": null
+      }
+    }
+  ],
+  "aggregate": {
+    "constraint": {
+      "precision@k": {
+        "mean": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ]
+      },
+      "recall@k": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ]
+      },
+      "ndcg@k": {
+        "mean": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ]
+      },
+      "ild": {
+        "mean": 0.413,
+        "ci95": [
+          0.312,
+          0.511
+        ]
+      },
+      "serendipity": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ]
+      },
+      "accuracy": {
+        "mean": 0.91,
+        "ci95": [
+          0.76,
+          1.0
+        ]
+      },
+      "partial_accuracy": {
+        "mean": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ]
+      },
+      "coverage": 0.055,
+      "personalization_jaccard": 0.99
+    },
+    "bandit": {
+      "precision@k": {
+        "mean": 0.5,
+        "ci95": [
+          0.5,
+          0.5
+        ]
+      },
+      "recall@k": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ]
+      },
+      "ndcg@k": {
+        "mean": 0.699,
+        "ci95": [
+          0.699,
+          0.699
+        ]
+      },
+      "ild": {
+        "mean": 0.811,
+        "ci95": [
+          0.793,
+          0.83
+        ]
+      },
+      "serendipity": {
+        "mean": 0.5,
+        "ci95": [
+          0.5,
+          0.5
+        ]
+      },
+      "accuracy": {
+        "mean": 0.49,
+        "ci95": [
+          0.47,
+          0.5
+        ]
+      },
+      "partial_accuracy": {
+        "mean": 0.5,
+        "ci95": [
+          0.5,
+          0.5
+        ]
+      },
+      "coverage": 0.057,
+      "personalization_jaccard": 0.995
+    }
+  },
+  "settings": {
+    "top_k": 10,
+    "bootstrap_B": 1000,
+    "catalog_size": 1682
+  }
+}

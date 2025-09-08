@@ -23,16 +23,13 @@ class _ProfileSelectionPageState extends State<ProfileSelectionPage> {
     context.push('/home/$userId');
   }
 
-  void _onAddProfile() {
-    // TODO: Naviga alla pagina di creazione profilo
-    // context.push('/profiles/new');
-    debugPrint('Add new profile');
-  }
-
-  void _onEditProfile(String userId) {
-    // TODO: Naviga alla pagina di modifica profilo
-    // context.push('/profiles/$userId/edit');
-    debugPrint('Edit profile: $userId');
+  void _onAddProfile() async {
+    final created = await context.push<bool>('/profiles/new');
+    if (created == true && mounted) {
+      setState(() {
+        _futureUsers = ApiClient.fetchUserIds(); // ricarica elenco
+      });
+    }
   }
 
   @override
@@ -81,7 +78,6 @@ class _ProfileSelectionPageState extends State<ProfileSelectionPage> {
                         (u) => ProfileAvatar(
                           label: u,
                           onTap: () => _onOpenProfile(u),
-                          onEdit: () => _onEditProfile(u),
                         ),
                       ),
                       ProfileAvatar(
