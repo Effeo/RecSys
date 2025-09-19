@@ -22,81 +22,58 @@ class ApiClient {
     return <String>[];
   }
 
-  // 🔹 NUOVO: recupera preferenze (per leggere liked_movie)
-  static Future<Map<String, dynamic>> fetchUserPreferences(String userId) async {
+  static Future<Map<String, dynamic>> fetchUserPreferences(
+    String userId,
+  ) async {
     final res = await http.get(Uri.parse('$baseUrl/users/$userId'));
     if (res.statusCode != 200) {
       throw Exception('Errore backend: ${res.statusCode}');
     }
     final data = jsonDecode(res.body) as Map<String, dynamic>;
-    // backend risponde con {"status":"ok","user_id":"...","preferences":{...}}
-    return (data['preferences'] as Map<String, dynamic>? ?? <String, dynamic>{});
+    return (data['preferences'] as Map<String, dynamic>? ??
+        <String, dynamic>{});
   }
 
-  static Future<List<Movie>> fetchRecommendations(String userId) async {
-    final res = await http.get(
-      Uri.parse('$baseUrl/recommendations/$userId?top_k=20'),
-    );
-    if (res.statusCode != 200) {
-      throw Exception('Errore backend: ${res.statusCode}');
-    }
-    final data = jsonDecode(res.body);
-    if (data['status'] == 'no_match') return [];
-    final List list = data['results'] ?? [];
-    return list.map((e) => Movie.fromJson(e)).toList();
-  }
-
-  static Future<List<Movie>> fetchSimilar(String title) async {
-    // URL-encode del titolo (spazi, caratteri speciali)
-    final encodedTitle = Uri.encodeComponent(title);
-    final res = await http.get(
-      Uri.parse('$baseUrl/similar_movies/$encodedTitle?top_k=20'),
-    );
-    if (res.statusCode != 200) {
-      throw Exception('Errore backend: ${res.statusCode}');
-    }
-    final data = jsonDecode(res.body);
-    if (data['status'] == 'no_match') return [];
-    final List list = data['results'] ?? [];
-    return list.map((e) => Movie.fromJson(e)).toList();
-  }
-
-  // ===== Bandit (ritorna (exploit, explore)) =====
-  static Future<(List<Movie>, List<Movie>)> fetchBandit(
+  static Future<List<Movie>> fetchRecommendations(
     String userId, {
-    int topK = 16,
-    double epsilon = 0.35,
-    int candidatePool = 140,
-    int exploreExtra = 400,
-    int? seed,
+    bool useSampled = true, // true = sampled, false = top_deterministic
   }) async {
-    final uri = Uri.parse(
-      '$baseUrl/recommendations_bandit/$userId'
-      '?top_k=$topK&epsilon=$epsilon&candidate_pool=$candidatePool&explore_extra=$exploreExtra'
-      '${seed != null ? '&seed=$seed' : ''}',
-    );
-
+    final uri = Uri.parse('$baseUrl/recommendations_hybrid/$userId');
     final res = await http.get(uri);
     if (res.statusCode != 200) {
-      throw Exception('Errore backend: ${res.statusCode}');
+      throw Exception('Errore backend: ${res.statusCode} — ${res.body}');
     }
-    final data = jsonDecode(res.body);
-    if (data['status'] == 'no_match') return (<Movie>[], <Movie>[]);
 
-    final List raw = data['results'] ?? [];
-    final movies = raw.map((e) => Movie.fromJson(e)).toList();
+    final Map<String, dynamic> data =
+        jsonDecode(res.body) as Map<String, dynamic>;
 
-    final explore = movies.where((m) => m.pickStrategy == 'explore').toList();
-    final exploit = movies.where((m) => m.pickStrategy == 'exploit').toList();
+    if ((data['status'] as String?) != 'ok') {
+      return <Movie>[];
+    }
 
-    return (exploit, explore);
+    print(data);
+    final String key = useSampled ? 'sampled' : 'top_deterministic';
+    final List<dynamic> rawList =
+        (data[key] as List<dynamic>? ?? const <dynamic>[]);
+
+    final List<Movie> out = <Movie>[];
+    for (final item in rawList) {
+      if (item is Map<String, dynamic>) {
+        final m = Movie.fromJson(item);
+        // scarta righe senza titolo per evitare Movie “vuoti”
+        if (m.title.trim().isNotEmpty) {
+          out.add(m);
+          if (out.length == 10) break; // massimizza 10
+        }
+      }
+    }
+    return out;
   }
 
   static Future<void> createOrUpdateUser(
     String userId,
     Map<String, dynamic> prefs,
   ) async {
-    // upsert lato backend
     final uri = Uri.parse('$baseUrl/users/$userId');
     final r = await http.post(
       uri,

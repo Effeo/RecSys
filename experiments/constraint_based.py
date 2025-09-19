@@ -1,16 +1,9 @@
 import pandas as pd
-
-# ====================================
-# Costanti peso per le nuove features
-# ====================================
-AWARD_WEIGHT     = 0.3   # bonus se film premiato
-DIRECTOR_WEIGHT  = 1   # bonus se regista gradito
-RUNTIME_WEIGHT   = 0.2   # bonus se durata entro la tolleranza
-
+import numpy as np
 # ========================
 # 1. Carica dataset
 # ========================
-df = pd.read_csv("data/movies_enriched.csv")
+df = pd.read_csv("../data/movies_enriched.csv")
 
 # Assicura tipi corretti
 df["release_date"] = pd.to_datetime(df["release_date"], errors="coerce")
@@ -75,50 +68,89 @@ utenti = {
     }
 }
 
-# ========================
-# 3. Funzione di raccomandazione
-# ========================
+# ====================================
+# Pesi (bonus/malus)
+# ====================================
+AWARD_WEIGHT                  = 0.3   # bonus se film premiato
+DIRECTOR_WEIGHT               = 1.0   # bonus se regista gradito
+RUNTIME_WEIGHT                = 0.2   # bonus se durata entro la tolleranza
+
+FORBIDDEN_GENRE_MALUS         = 1.5   # malus per ciascun genere vietato presente
+RUNTIME_OUTSIDE_MALUS         = 0.3   # intensità base del malus fuori tolleranza (scalato)
+YEAR_BELOW_MALUS_PER_YEAR     = 0.02  # malus per ogni anno sotto 'min_release_year'
+MISSING_YEAR_MALUS            = 0.1   # malus fisso se l'anno è mancante
+
 def recommend_movies(df, utente_id, pref, top_k=5):
-    # --- hard-filter su anno -----------------------------
-    df_f = df[df["release_date"].dt.year >= pref["min_release_year"]].copy()
+    # Nessun filtro duro: lavoriamo su tutto il dataset
+    df_f = df.copy()
 
-    # --- hard-filter: rimuovi film con almeno un genere vietato
-    penalita_genere = df_f[list(pref["generi_vietati"])].sum(axis=1)
-    df_f = df_f[penalita_genere == 0]
+    # Punteggio iniziale
+    score = pd.Series(0.0, index=df_f.index)
 
-    # --- punteggio di base (generi) ----------------------
-    score = df_f[list(pref["generi_desiderati"])].sum(axis=1)
+    # --- base: generi desiderati (bonus) -----------------
+    if pref.get("generi_desiderati"):
+        cols = [g for g in pref["generi_desiderati"] if g in df_f.columns]
+        if cols:
+            score += df_f[cols].sum(axis=1)
 
-    # --- soft bonus: film premiato -----------------------
+    # --- premi (bonus) -----------------------------------
     if pref.get("prefer_award_winning", False):
-        score += df_f["awards"] * AWARD_WEIGHT   # awards è 0/1
+        awarded = (df_f["awards"].fillna(0) > 0).astype(int)
+        score += awarded * AWARD_WEIGHT
 
-    # --- soft bonus: regista gradito ---------------------
+    # --- regista gradito (bonus) -------------------------
     if pref.get("favorite_directors"):
         liked_dir = df_f["director"].isin(pref["favorite_directors"]).astype(int)
         score += liked_dir * DIRECTOR_WEIGHT
 
-    # --- soft bonus: durata vicina alla preferita --------
+    # --- runtime: bonus dentro tolleranza, malus fuori ---
     if pref.get("preferred_runtime") is not None:
+        tol = max(0, pref.get("tolleranza_runtime", 15))
         delta = (df_f["runtime"] - pref["preferred_runtime"]).abs()
-        near = (delta <= pref.get("tolleranza_runtime", 15)).astype(int)
-        score += near * RUNTIME_WEIGHT
+
+        inside = (delta <= tol).astype(int)
+        score += inside * RUNTIME_WEIGHT
+
+        excess = np.maximum(0, delta - tol)
+        denom = tol if tol > 0 else 1
+        scale = (excess / denom).clip(0, 3)  # limita il malus
+        score -= scale * RUNTIME_OUTSIDE_MALUS
+
+    # --- generi vietati (malus, senza eliminare nulla) ---
+    if pref.get("generi_vietati"):
+        cols_forbidden = [g for g in pref["generi_vietati"] if g in df_f.columns]
+        if cols_forbidden:
+            present_forbidden = df_f[cols_forbidden].sum(axis=1)
+            score -= present_forbidden * FORBIDDEN_GENRE_MALUS
+
+    # --- ANNO: malus se sotto min_release_year (nessun drop) ---
+    if pref.get("min_release_year") is not None:
+        years = df_f["release_date"].dt.year
+        missing_mask = years.isna()
+        score -= missing_mask.astype(float) * MISSING_YEAR_MALUS
+
+        diff = (pref["min_release_year"] - years.fillna(pref["min_release_year"])).clip(lower=0)
+        score -= diff * YEAR_BELOW_MALUS_PER_YEAR
 
     df_f["score"] = score
 
-    # --- ordina e restituisci ----------------------------
+    # Ordina e restituisci
     recs = df_f.sort_values(by="score", ascending=False).head(top_k)
 
     print(f"\nRaccomandazioni per {utente_id}:\n")
-    cols_out = ["movie_title", "release_date", "score"] + list(pref["generi_desiderati"])
+    cols_out = ["movie_title", "release_date", "score"]
+    if pref.get("generi_desiderati"):
+        cols_out += [g for g in pref["generi_desiderati"] if g in df_f.columns]
     if pref.get("prefer_award_winning"):
         cols_out.append("awards")
     if pref.get("favorite_directors"):
         cols_out.append("director")
     if pref.get("preferred_runtime") is not None:
         cols_out.append("runtime")
-    print(recs[cols_out])
+    if pref.get("generi_vietati"):
+        cols_out += [g for g in pref["generi_vietati"] if g in df_f.columns]
 
+    print(recs[cols_out])
     return recs
 
 # ========================

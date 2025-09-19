@@ -6,13 +6,17 @@ class Movie {
   final String? director;
   final num? runtime; // in secondi/minuti a seconda del dataset
   final num? awards;
-  final num? score;       // presente nelle recommendations
-  final num? similarity;  // presente nelle similar_movies
+  final num? score; // presente nelle recommendations
+  final num? similarity; // presente nelle similar_movies
 
   // --- campi aggiuntivi per bandit ---
-  final bool novel;              // true se marcato come "novità"
-  final String? noveltyReason;   // motivo per cui è considerato nuovo
-  final String? pickStrategy;    // "exploit" | "explore"
+  final bool novel; // true se marcato come "novità"
+  final String? noveltyReason; // motivo per cui è considerato nuovo
+  final String? pickStrategy; // "exploit" | "explore"
+
+  final num? cfScore;
+  final num? hybridScore;
+  final num? probability;
 
   Movie({
     required this.title,
@@ -27,6 +31,9 @@ class Movie {
     this.novel = false,
     this.noveltyReason,
     this.pickStrategy,
+    this.cfScore,
+    this.hybridScore,
+    this.probability,
   });
 
   factory Movie.fromJson(Map<String, dynamic> json) {
@@ -44,6 +51,20 @@ class Movie {
       novel: json['novel'] == true,
       noveltyReason: json['novelty_reason'] as String?,
       pickStrategy: json['pick_strategy'] as String?,
+    );
+  }
+
+  static fromHybridJson(Map<String, dynamic> e) {
+    return Movie(
+      movieId: e['movie_id'] as int,
+      title: e['movie_title'] as String,
+      score: e['hybrid_score'] as num,
+      cfScore: e['cf_score'] as num,
+      hybridScore: e['hybrid_score'] as num,
+      probability: e['prob'] as num,
+      director: e['director'] as String,
+      runtime: e['runtime'] as num,
+      releaseDate: e['release_date'] as String,
     );
   }
 }

@@ -133,6 +133,7 @@ class _MovieDetailSheetState extends State<MovieDetailSheet> {
                                   ),
                                 ),
                               ),
+
                             const SizedBox(height: 24),
                           ],
                         ),

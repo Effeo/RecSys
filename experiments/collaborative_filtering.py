@@ -14,15 +14,13 @@ X = rating_utility_matrix.T
 
 SVD = TruncatedSVD(n_components=30)
 transformed_matrix = SVD.fit_transform(X)
-
 corr_matrix = np.corrcoef(transformed_matrix)
-print(corr_matrix.shape)
+
 movies = rating_utility_matrix.columns
 movies_list = list(movies)
 
-movie_toy_story = movies_list.index('Toy Story')
+movie_toy_story = movies_list.index('GoldenEye')
 corr_toy_story = corr_matrix[movie_toy_story]
-correleted_movies_toy_story = list(movies[(corr_toy_story < 1.0) & (corr_toy_story > 0.7)])
 
 for movie, corr in zip(movies, corr_toy_story):
     if corr < 1.0 and corr > 0.7:

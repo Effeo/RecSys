@@ -1,323 +1,464 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
+"""
+Valutazione sistema di raccomandazione (backend + utils invariati).
+
+Metriche:
+- Accuracy@K:   quota item che rispettano TUTTI i vincoli "hard"
+                (no generi vietati, min_release_year, runtime entro tolleranza se definito).
+- PartialAccuracy@K: media, sui K item, della percentuale di vincoli soddisfatti (3 check: forbidden, year, runtime).
+- Diversity@K:
+    * avg Jaccard distance sui vettori di generi binari
+    * director diversity = registi unici / K
+    * release year variance (proxy copertura temporale)
+- Serendipity@K: media su item di [ relevance * unexpectedness ],
+    dove relevance = min-max(hybrid_score) su lista;
+          unexpectedness = 1 - similarity
+          similarity = cf_score normalizzato in [0,1] tramite (cf+1)/2 (clipped)
+                       (fallback: cosine similarity sui generi col "liked_movie").
+
+Per la lista "sampled" lo script ripete N run (seed diversi) e aggrega media/std.
+Salva un unico JSON con risultati per utente e aggregati globali.
+"""
+
+from __future__ import annotations
+import argparse, json, math, time, itertools, statistics, os
+from datetime import datetime
+from typing import Dict, Any, List, Tuple, Optional
+
+import numpy as np
+import pandas as pd
 import requests
-import itertools
-import json
-import math
-import os
-import random
-from collections import defaultdict
-from statistics import mean
 
-BASE = "http://127.0.0.1:8058"
-CATALOG_SIZE = 1682
-TOP_K_DEFAULT = 10
-BOOTSTRAP_B = 1000
-BOOTSTRAP_SEED = 12345
 
-# ========== Helpers ==========
-def safe_float(x, default=0.0):
-    if x is None:
-        return default
+# -----------------------------
+# Utility di I/O e normalizzazioni
+# -----------------------------
+def read_movies(movies_csv: str) -> pd.DataFrame:
+    df = pd.read_csv(movies_csv)
+    # parsing colonne note
+    if "release_date" in df.columns:
+        df["release_date"] = pd.to_datetime(df["release_date"], errors="coerce")
+    if "runtime" in df.columns:
+        df["runtime"] = pd.to_numeric(df["runtime"], errors="coerce")
+    if "awards" in df.columns:
+        df["awards"] = pd.to_numeric(df["awards"], errors="coerce").fillna(0)
+
+    # genere: insieme standard (adattabile a dataset 1682 film MovieLens 100k)
+    KNOWN_GENRES = [
+        "unknown","Action","Adventure","Animation","Children","Comedy","Crime","Documentary",
+        "Drama","Fantasy","Film_noir","Horror","Musical","Mystery","Romance","Sci_fi",
+        "Thriller","War","Western"
+    ]
+    genres = [g for g in KNOWN_GENRES if g in df.columns]
+    # campi base
+    for col in ["movie_id","movie_title","director"]:
+        if col not in df.columns:
+            raise ValueError(f"Colonna mancante nel CSV: {col}")
+
+    return df, genres
+
+
+def minmax_series(s: pd.Series) -> pd.Series:
+    s = pd.to_numeric(s, errors="coerce").fillna(0.0)
+    mn, mx = float(s.min()), float(s.max())
+    if not math.isfinite(mn) or not math.isfinite(mx) or mx - mn <= 1e-12:
+        # tutti uguali → tutti 0.0
+        return pd.Series(np.zeros(len(s)), index=s.index)
+    return (s - mn) / (mx - mn)
+
+
+def norm_cf_to_similarity(cf: float) -> float:
+    # cf_score atteso in [-1,1]; normalizzo a [0,1]
+    if cf is None or not math.isfinite(cf):
+        return None
+    return float(np.clip((cf + 1.0) / 2.0, 0.0, 1.0))
+
+
+def cosine_sim(a: np.ndarray, b: np.ndarray) -> float:
+    na = np.linalg.norm(a)
+    nb = np.linalg.norm(b)
+    if na == 0 or nb == 0:
+        return 0.0
+    return float(np.dot(a, b) / (na * nb))
+
+
+# -----------------------------
+# Vincoli & feature helper
+# -----------------------------
+def movie_year(row: pd.Series) -> Optional[int]:
+    if "release_date" not in row or pd.isna(row["release_date"]):
+        return None
     try:
-        return float(x)
-    except (ValueError, TypeError):
-        return default
+        return int(pd.to_datetime(row["release_date"]).year)
+    except Exception:
+        return None
 
-def get_movie_id(rec):
-    mid = rec.get("movie_id")
-    return None if mid is None else str(mid)
 
-def _get_json(url, params=None):
-    r = requests.get(url, params=params, timeout=30)
-    if r.status_code == 404:
-        raise FileNotFoundError(f"404 Not Found: {url}")
+def genres_vector(row: pd.Series, genre_cols: List[str]) -> np.ndarray:
+    vals = []
+    for g in genre_cols:
+        v = row.get(g, 0)
+        try:
+            vals.append(int(v))
+        except Exception:
+            vals.append(0)
+    return np.array(vals, dtype=int)
+
+
+def jaccard_distance(x: np.ndarray, y: np.ndarray) -> float:
+    inter = np.logical_and(x == 1, y == 1).sum()
+    union = np.logical_or(x == 1, y == 1).sum()
+    if union == 0:
+        return 0.0
+    return 1.0 - (inter / union)
+
+
+def check_constraints(row: pd.Series, prefs: Dict[str, Any], genre_cols: List[str]) -> Tuple[bool, float]:
+    """
+    Ritorna:
+      - passed_all (bool)
+      - partial_score ∈ {0, 1/3, 2/3, 1} (media dei 3 check)
+    Check:
+      1) NO generi vietati
+      2) anno >= min_release_year (se anno mancante → fail)
+      3) runtime entro preferred_runtime ± tolleranza (se preferred non definito → considerato satisfied)
+    """
+    # 1) forbidden genres
+    forbidden = set(prefs.get("generi_vietati", []) or [])
+    forb_cols = [g for g in forbidden if g in genre_cols]
+    forb_ok = True
+    if forb_cols:
+        present = sum(int(row.get(g, 0) or 0) for g in forb_cols)
+        forb_ok = (present == 0)
+
+    # 2) min year
+    min_year = prefs.get("min_release_year", None)
+    y = movie_year(row)
+    year_ok = True
+    if min_year is not None:
+        year_ok = (y is not None and int(y) >= int(min_year))
+
+    # 3) runtime range
+    pr = prefs.get("preferred_runtime", None)
+    tol = int(prefs.get("tolleranza_runtime", 0) or 0)
+    runtime_ok = True
+    if pr is not None:
+        rt = row.get("runtime", None)
+        if pd.isna(rt):
+            runtime_ok = False
+        else:
+            runtime_ok = (abs(float(rt) - float(pr)) <= tol)
+
+    flags = [forb_ok, year_ok, runtime_ok]
+    partial = sum(1.0 if f else 0.0 for f in flags) / 3.0
+    passed_all = all(flags)
+    return passed_all, partial
+
+
+# -----------------------------
+# Chiamate API backend
+# -----------------------------
+def api_get_users(base_url: str) -> List[str]:
+    r = requests.get(f"{base_url}/users", timeout=30)
+    r.raise_for_status()
+    data = r.json()
+    return data.get("users", [])
+
+
+def api_get_user_prefs(base_url: str, user_id: str) -> Dict[str, Any]:
+    r = requests.get(f"{base_url}/users/{user_id}", timeout=30)
+    r.raise_for_status()
+    data = r.json()
+    if data.get("status") != "ok":
+        raise RuntimeError(f"Preferenze utente non trovate per {user_id}: {data}")
+    return data.get("preferences", {})
+
+
+def api_get_recs(base_url: str, user_id: str, alpha: float, temperature: float, seed: Optional[int]) -> Dict[str, Any]:
+    params = {"alpha": alpha, "temperature": temperature}
+    if seed is not None:
+        params["seed"] = seed
+    r = requests.get(f"{base_url}/recommendations_hybrid/{user_id}", params=params, timeout=60)
     r.raise_for_status()
     return r.json()
 
-def fetch_user_ids():
-    r = requests.get(f"{BASE}/users")
-    r.raise_for_status()
-    return r.json().get("users", [])
 
-def fetch_user_prefs(user_id):
-    pr = requests.get(f"{BASE}/users/{user_id}")
-    if pr.status_code == 200:
-        return pr.json().get("preferences", {}) or {}
-    return {}
+# -----------------------------
+# Metriche su una lista (DataFrame)
+# -----------------------------
+def evaluate_list(
+    df_list: pd.DataFrame,
+    prefs: Dict[str, Any],
+    movies_df: pd.DataFrame,
+    genre_cols: List[str],
+    liked_movie_title: Optional[str]
+) -> Dict[str, Any]:
+    """
+    df_list: deve contenere almeno movie_id, movie_title, hybrid_score; cf_score opzionale.
+    """
+    # Uniamo metadati (genere, director, runtime, release_date) via movie_id
+    if "movie_id" not in df_list.columns:
+        raise ValueError("df_list deve avere 'movie_id'")
+    df_merge = df_list.merge(
+        movies_df[["movie_id", "release_date", "runtime", "director"] + genre_cols],
+        on="movie_id", how="left"
+    )
 
-# Torna sia risultati che meta (per bandit: diagnostica)
-def fetch_recs(user_id, method="constraint", **kwargs):
-    if method == "constraint":
-        url = f"{BASE}/recommendations/{user_id}"
-        params = {"top_k": kwargs.get("top_k", TOP_K_DEFAULT)}
-        resp = _get_json(url, params)
+    K = len(df_merge)
+    if K == 0:
         return {
-            "results": resp.get("results", []),
-            "meta": {"status": resp.get("status", "ok"), "epsilon": None, "diagnostics": None}
+            "K": 0, "accuracy": 0.0, "partial_accuracy": 0.0,
+            "diversity": {"jaccard_avg": 0.0, "director_diversity": 0.0, "year_variance": 0.0},
+            "serendipity": 0.0
         }
-    elif method == "bandit":
-        url1 = f"{BASE}/recommendations_bandit/{user_id}"
-        params = {
-            "top_k": kwargs.get("top_k", TOP_K_DEFAULT),
-            "epsilon": kwargs.get("epsilon", 0.35),
-            "candidate_pool": kwargs.get("candidate_pool", 160),
-            "explore_extra": kwargs.get("explore_extra", 400),
-            "seed": kwargs.get("seed", 42),
-        }
-        try:
-            resp = _get_json(url1, params)
-        except FileNotFoundError:
-            url2 = f"{BASE}/bandit/{user_id}"
-            resp = _get_json(url2, params)
-        return {
-            "results": resp.get("results", []),
-            "meta": {
-                "status": resp.get("status", "ok"),
-                "epsilon": resp.get("epsilon"),
-                "diagnostics": resp.get("diagnostics", {})
-            }
-        }
+
+    # --- Accuracy & Partial ---
+    flags_all = []
+    partials = []
+    for _, row in df_merge.iterrows():
+        passed, p = check_constraints(row, prefs, genre_cols)
+        flags_all.append(1.0 if passed else 0.0)
+        partials.append(p)
+    accuracy = float(np.mean(flags_all))
+    partial_acc = float(np.mean(partials))
+
+    # --- Diversity ---
+    # Generi: Jaccard medio su tutte le coppie
+    G = np.stack([genres_vector(row, genre_cols) for _, row in df_merge.iterrows()], axis=0)
+    if K >= 2:
+        dists = []
+        for i, j in itertools.combinations(range(K), 2):
+            dists.append(jaccard_distance(G[i], G[j]))
+        jaccard_avg = float(np.mean(dists)) if dists else 0.0
     else:
-        raise ValueError(f"Metodo non supportato: {method}")
+        jaccard_avg = 0.0
 
-# ========== Ground truth (opzionale) ==========
-# relevant.json (facoltativo):
-# { "Utente1": ["568","53",...], "Utente2": [...] }
-def load_relevant_local():
-    path = "relevant.json"
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return {uid: {str(x) for x in ids} for uid, ids in data.items()}
-    return {}
+    # Registi: quota unici
+    uniq_dir = df_merge["director"].fillna("UNK").nunique()
+    director_div = float(uniq_dir) / float(K)
 
-# ========== Metriche ==========
-def is_genre_flag(k, v):
-    return (
-        k not in ("unknown", "movie_id", "score", "novel", "pick_strategy", "novelty_reason", "movie_title") and
-        ((v == 1) or (v is True) or (isinstance(v, str) and v == "1"))
-    )
+    # Varianza anno
+    years = [movie_year(row) for _, row in df_merge.iterrows()]
+    years_num = [y for y in years if y is not None]
+    year_var = float(np.var(years_num)) if len(years_num) >= 2 else 0.0
 
-def accuracy(results):
-    if not results: return 0.0
-    return sum(1 for r in results if safe_float(r.get("score"), 0.0) >= 2.0) / len(results)
+    diversity = {
+        "jaccard_avg": jaccard_avg,
+        "director_diversity": director_div,
+        "year_variance": year_var,
+    }
 
-def partial_accuracy(results):
-    if not results: return 0.0
-    return sum(1 for r in results if safe_float(r.get("score"), 0.0) >= 1.0) / len(results)
+    # --- Serendipity ---
+    # relevance: min-max(hybrid_score)
+    if "hybrid_score" in df_merge.columns:
+        rel = minmax_series(df_merge["hybrid_score"]).values
+    else:
+        # fallback su prob se presente
+        rel = minmax_series(df_merge.get("prob", pd.Series(np.ones(K)))).values
 
-def diversity_ild(results):
-    G = []
-    for r in results:
-        genres = {k for k, v in r.items() if is_genre_flag(k, v)}
-        if genres: G.append(genres)
-    if len(G) < 2: return 0.0
-    pairs = list(itertools.combinations(G, 2))
-    if not pairs: return 0.0
-    def jacc(a, b):
-        inter = len(a & b); union = len(a | b)
-        return inter / (union or 1)
-    sims = [jacc(a, b) for a, b in pairs]
-    return 1.0 - (sum(sims) / len(sims))
+    # unexpectedness: 1 - similarity
+    # similarity da cf_score se disponibile; altrimenti cosine sui generi col liked_movie
+    sim = np.zeros(K, dtype=float)
 
-def serendipity(results, prefs):
-    if not results: return 0.0
-    desiderati = set(prefs.get("generi_desiderati", []) or [])
-    if not desiderati: return 0.0
-    novel = 0
-    for r in results:
-        genres = {k for k, v in r.items() if is_genre_flag(k, v)}
-        if genres.isdisjoint(desiderati):
-            novel += 1
-    return novel / len(results)
-
-def coverage(all_results):
-    rec_ids = {get_movie_id(r) for rs in all_results for r in rs if get_movie_id(r) is not None}
-    return len(rec_ids) / CATALOG_SIZE
-
-def personalization_jaccard(all_users_results):
-    if len(all_users_results) < 2: return 0.0
-    sims = []
-    for a, b in itertools.combinations(all_users_results, 2):
-        setA = {get_movie_id(r) for r in a if get_movie_id(r) is not None}
-        setB = {get_movie_id(r) for r in b if get_movie_id(r) is not None}
-        inter = len(setA & setB); union = len(setA | setB)
-        sims.append(inter / (union or 1))
-    return 1 - (sum(sims) / len(sims))
-
-# proxy di “rilevanza” se non c’è GT
-def proxy_relevance_from_prefs(rec, prefs):
-    desiderati = set(prefs.get("generi_desiderati", []) or [])
-    vietati = set(prefs.get("generi_vietati", []) or [])
-    genres = {k for k, v in rec.items() if is_genre_flag(k, v)}
-    if vietati and not genres.isdisjoint(vietati): return 0
-    if desiderati and genres.intersection(desiderati): return 1
-    return 0
-
-def precision_at_k(results, relevant_ids=None, prefs=None, k=TOP_K_DEFAULT):
-    if not results: return 0.0
-    recs = results[:k]
-    hits = 0
-    for r in recs:
-        mid = get_movie_id(r)
-        if relevant_ids is not None:
-            hits += 1 if (mid and mid in relevant_ids) else 0
+    if "cf_score" in df_merge.columns and df_merge["cf_score"].notna().any():
+        cf = df_merge["cf_score"].astype(float).fillna(0.0).values
+        sim = np.array([norm_cf_to_similarity(x) if x is not None else 0.0 for x in cf], dtype=float)
+    else:
+        # fallback: cosine con il vettore generi del liked_movie
+        if liked_movie_title:
+            liked_row = movies_df.loc[movies_df["movie_title"] == liked_movie_title]
+            if not liked_row.empty:
+                v_like = genres_vector(liked_row.iloc[0], genre_cols)
+                for idx in range(K):
+                    sim[idx] = cosine_sim(G[idx], v_like)
+            else:
+                sim[:] = 0.0
         else:
-            hits += 1 if (prefs and proxy_relevance_from_prefs(r, prefs) == 1) else 0
-    return hits / max(1, len(recs))
+            sim[:] = 0.0
 
-def recall_at_k(results, relevant_ids=None, prefs=None, k=TOP_K_DEFAULT):
-    if relevant_ids is None or not relevant_ids: return 0.0
-    recs = results[:k]
-    hits = sum(1 for r in recs if (get_movie_id(r) in relevant_ids))
-    return hits / len(relevant_ids)
+    sim = np.clip(sim, 0.0, 1.0)
+    unexpected = 1.0 - sim
+    ser_item = rel * unexpected
+    serendipity = float(np.mean(ser_item))
 
-def ndcg_at_k(results, relevant_ids=None, prefs=None, k=TOP_K_DEFAULT):
-    if not results: return 0.0
-    def rel(r):
-        if relevant_ids is not None:
-            mid = get_movie_id(r)
-            return 1 if (mid and mid in relevant_ids) else 0
-        else:
-            return 1 if (prefs and proxy_relevance_from_prefs(r, prefs) == 1) else 0
-    recs = results[:k]
-    dcg = 0.0
-    for idx, r in enumerate(recs, start=1):
-        g = rel(r); dcg += g if idx == 1 else g / math.log2(idx)
-    gains_sorted = sorted([rel(r) for r in recs], reverse=True)
-    idcg = 0.0
-    for idx, g in enumerate(gains_sorted, start=1):
-        idcg += g if idx == 1 else g / math.log2(idx)
-    return 0.0 if idcg == 0 else dcg / idcg
+    return {
+        "K": K,
+        "accuracy": accuracy,
+        "partial_accuracy": partial_acc,
+        "diversity": diversity,
+        "serendipity": serendipity
+    }
 
-def ci_bootstrap(values, alpha=0.05, B=BOOTSTRAP_B, seed=BOOTSTRAP_SEED):
-    if not values: return (0.0, 0.0, 0.0)
-    rnd = random.Random(seed)
-    n = len(values)
-    boots = []
-    for _ in range(B):
-        sample = [values[rnd.randrange(n)] for _ in range(n)]
-        boots.append(mean(sample))
-    boots.sort()
-    low = boots[int((alpha/2)*B)]
-    high = boots[int((1 - alpha/2)*B)-1]
-    return (round(mean(values), 3), round(low, 3), round(high, 3))
 
-# ========== valutazione per utente ==========
-def eval_user(user_id, prefs, relevant_ids, top_k=TOP_K_DEFAULT, epsilon=0.35, candidate_pool=160, explore_extra=400, seed=42):
-    # constraint
-    c_resp = fetch_recs(user_id, method="constraint", top_k=top_k)
-    c_results = c_resp["results"]
+# -----------------------------
+# Valutazione per utente
+# -----------------------------
+def evaluate_user(
+    base_url: str,
+    user_id: str,
+    alpha: float,
+    temperature: float,
+    runs: int,
+    movies_df: pd.DataFrame,
+    genre_cols: List[str],
+) -> Dict[str, Any]:
+    prefs = api_get_user_prefs(base_url, user_id)
+    liked = prefs.get("liked_movie")
 
-    # bandit
-    b_resp = fetch_recs(
-        user_id,
-        method="bandit",
-        top_k=top_k,
-        epsilon=epsilon,
-        candidate_pool=candidate_pool,
-        explore_extra=explore_extra,
-        seed=seed
-    )
-    b_results = b_resp["results"]
-    b_meta = b_resp.get("meta", {}) or {}
-    b_diag = b_meta.get("diagnostics") or {}
+    # --- deterministico
+    data = api_get_recs(base_url, user_id, alpha=alpha, temperature=temperature, seed=None)
+    top_det = pd.DataFrame(data.get("top_deterministic", []))
+    det_metrics = evaluate_list(top_det, prefs, movies_df, genre_cols, liked)
 
-    rows = []
+    # --- sampled (stocastico) ripetuto
+    sampled_metrics = []
+    for run_seed in range(runs):
+        data_s = api_get_recs(base_url, user_id, alpha=alpha, temperature=temperature, seed=run_seed)
+        sampled = pd.DataFrame(data_s.get("sampled", []))
+        m = evaluate_list(sampled, prefs, movies_df, genre_cols, liked)
+        sampled_metrics.append(m)
 
-    for method, results, meta in (
-        ("constraint", c_results, {"epsilon": None, "diagnostics": None}),
-        ("bandit", b_results, {"epsilon": b_meta.get("epsilon"), "diagnostics": b_diag}),
-    ):
-        ild_val = diversity_ild(results)
-        row = {
-            "user_id": user_id,
-            "method": method,
-            "n": len(results),
-            "accuracy": accuracy(results),
-            "partial_accuracy": partial_accuracy(results),
-            "ild": ild_val,
-            "diversity": ild_val,  # retro-compatibilità: diversity = ILD
-            "serendipity": serendipity(results, prefs),
-            "precision@k": precision_at_k(results, relevant_ids, prefs, k=top_k),
-            "recall@k": recall_at_k(results, relevant_ids, prefs, k=top_k),
-            "ndcg@k": ndcg_at_k(results, relevant_ids, prefs, k=top_k),
-            "movie_ids": [r.get("movie_id") for r in results if r.get("movie_id")],
-        }
-        # aggiungi diagnostica bandit se presente
-        if method == "bandit" and meta.get("diagnostics") is not None:
-            d = meta["diagnostics"]
-            row["bandit_meta"] = {
-                "epsilon": meta.get("epsilon"),
-                "exploit_pool_size": d.get("exploit_pool_size"),
-                "explore_pool_size": d.get("explore_pool_size"),
-                "explore_ratio": d.get("explore_ratio"),
-                "novel_count": d.get("novel_count")
-            }
-        rows.append(row)
+    # aggrego sampled
+    def agg_metric(path: List[str], default=0.0) -> Tuple[float, float]:
+        vals = []
+        for m in sampled_metrics:
+            v = m
+            for p in path:
+                v = v.get(p, {})
+            if isinstance(v, dict):
+                # se chiediamo una foglia e troviamo dict, non è la foglia
+                continue
+            vals.append(float(v))
+        if not vals:
+            return default, 0.0
+        return float(np.mean(vals)), float(np.std(vals, ddof=1) if len(vals) > 1 else 0.0)
 
-    return rows
+    sampled_agg = {
+        "accuracy": _tuple_to_dict(*agg_metric(["accuracy"])),
+        "partial_accuracy": _tuple_to_dict(*agg_metric(["partial_accuracy"])),
+        "serendipity": _tuple_to_dict(*agg_metric(["serendipity"])),
+        "diversity": {
+            "jaccard_avg": _tuple_to_dict(*agg_metric(["diversity", "jaccard_avg"])),
+            "director_diversity": _tuple_to_dict(*agg_metric(["diversity", "director_diversity"])),
+            "year_variance": _tuple_to_dict(*agg_metric(["diversity", "year_variance"])),
+        },
+        "runs": runs,
+    }
 
-# ========== main ==========
+    return {
+        "user_id": user_id,
+        "deterministic": det_metrics,
+        "sampled": sampled_agg,
+        "params": {"alpha": alpha, "temperature": temperature},
+    }
+
+
+def _tuple_to_dict(mean: float, std: float) -> Dict[str, float]:
+    return {"mean": float(mean), "std": float(std)}
+
+
+# -----------------------------
+# Main
+# -----------------------------
 def main():
-    users = fetch_user_ids()
-    if not users:
-        print("Nessun utente trovato")
-        return
+    ap = argparse.ArgumentParser(description="Valutazione recommender (backend invariato)")
+    ap.add_argument("--base-url", type=str, default="http://localhost:8000", help="Base URL FastAPI backend")
+    ap.add_argument("--movies-file", type=str, required=True, help="Path al CSV dei film (1682 righe nel tuo set)")
+    ap.add_argument("--alpha", type=float, default=0.5, help="Peso CF nella somma ibrida (pass-through all'endpoint)")
+    ap.add_argument("--temperature", type=float, default=0.7, help="Temperatura softmax (pass-through all'endpoint)")
+    ap.add_argument("--runs", type=int, default=20, help="Ripetizioni per la lista 'sampled'")
+    ap.add_argument("--output", type=str, default="results", help="Cartella output")
+    args = ap.parse_args()
 
-    prefs_map = {uid: fetch_user_prefs(uid) for uid in users}
-    relevant_local = load_relevant_local()
+    os.makedirs(args.output, exist_ok=True)
 
-    all_rows = []
-    for uid in users:
+    # Carico film + colonne genere
+    movies_df, genre_cols = read_movies(args.movies_file)
+
+    # Elenco utenti via API
+    user_ids = api_get_users(args.base_url)
+    if not user_ids:
+        raise RuntimeError("Nessun utente trovato via /users")
+
+    # Valuto
+    per_user = []
+    for uid in user_ids:
         try:
-            relevant_ids = relevant_local.get(uid)  # None se manca: useremo proxy
-            all_rows.extend(
-                eval_user(
-                    uid,
-                    prefs_map.get(uid, {}),
-                    relevant_ids,
-                    top_k=TOP_K_DEFAULT,
-                    epsilon=0.35,
-                    candidate_pool=160,
-                    explore_extra=400,
-                    seed=42
-                )
+            res = evaluate_user(
+                base_url=args.base_url,
+                user_id=uid,
+                alpha=args.alpha,
+                temperature=args.temperature,
+                runs=args.runs,
+                movies_df=movies_df,
+                genre_cols=genre_cols,
             )
+            per_user.append(res)
+            print(f"[OK] {uid}")
         except Exception as e:
-            print(f"Errore {uid}: {e}")
+            print(f"[ERRORE] {uid}: {e}")
 
-    # aggregazione
-    agg = defaultdict(lambda: defaultdict(list))
-    per_method_results = defaultdict(list)
-    for r in all_rows:
-        m = r["method"]
-        for k in ("accuracy","partial_accuracy","ild","serendipity","precision@k","recall@k","ndcg@k"):
-            agg[m][k].append(r[k])
-        per_method_results[m].append([{"movie_id": mid} for mid in r["movie_ids"]])
+    # Aggregati globali (media semplice sui deterministic e sulle mean dei sampled)
+    def agg_over_users(key_path: List[str], is_sampled: bool) -> float:
+        vals = []
+        for u in per_user:
+            v = u["sampled"] if is_sampled else u["deterministic"]
+            tmp = v
+            for k in key_path:
+                tmp = tmp[k]
+            # sampled: leaf è {"mean":..,"std":..} → prendiamo "mean"
+            if is_sampled and isinstance(tmp, dict) and "mean" in tmp:
+                vals.append(float(tmp["mean"]))
+            elif not is_sampled and isinstance(tmp, (int, float)):
+                vals.append(float(tmp))
+        return float(np.mean(vals)) if vals else 0.0
 
-    aggregate = {}
-    for method, vals in agg.items():
-        out_m = {}
-        for metric_key in ("precision@k","recall@k","ndcg@k","ild","serendipity","accuracy","partial_accuracy"):
-            mu, lo, hi = ci_bootstrap(vals[metric_key], alpha=0.05, B=BOOTSTRAP_B, seed=BOOTSTRAP_SEED)
-            out_m[metric_key] = {"mean": mu, "ci95": [lo, hi]}
-        out_m["coverage"] = round(coverage(per_method_results[method]), 3)
-        out_m["personalization_jaccard"] = round(personalization_jaccard(per_method_results[method]), 3)
-        aggregate[method] = out_m
+    global_agg = {
+        "deterministic": {
+            "accuracy": agg_over_users(["accuracy"], False),
+            "partial_accuracy": agg_over_users(["partial_accuracy"], False),
+            "serendipity": agg_over_users(["serendipity"], False),
+            "diversity": {
+                "jaccard_avg": agg_over_users(["diversity", "jaccard_avg"], False),
+                "director_diversity": agg_over_users(["diversity", "director_diversity"], False),
+                "year_variance": agg_over_users(["diversity", "year_variance"], False),
+            },
+        },
+        "sampled": {
+            "accuracy": agg_over_users(["accuracy"], True),
+            "partial_accuracy": agg_over_users(["partial_accuracy"], True),
+            "serendipity": agg_over_users(["serendipity"], True),
+            "diversity": {
+                "jaccard_avg": agg_over_users(["diversity", "jaccard_avg"], True),
+                "director_diversity": agg_over_users(["diversity", "director_diversity"], True),
+                "year_variance": agg_over_users(["diversity", "year_variance"], True),
+            },
+        },
+    }
 
     out = {
-        "per_user": all_rows,
-        "aggregate": aggregate,
-        "settings": {
-            "top_k": TOP_K_DEFAULT,
-            "bootstrap_B": BOOTSTRAP_B,
-            "catalog_size": CATALOG_SIZE
-        }
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "params": {
+            "alpha": args.alpha,
+            "temperature": args.temperature,
+            "K": 10,  # coerente con backend attuale; se cambi TOP_K, non serve toccare lo script
+            "runs": args.runs,
+            "base_url": args.base_url,
+            "movies_file": args.movies_file,
+        },
+        "users_evaluated": [u["user_id"] for u in per_user],
+        "results_per_user": per_user,
+        "global_aggregates": global_agg,
     }
-    with open("results.json","w",encoding="utf-8") as f:
-        json.dump(out, f, indent=2, ensure_ascii=False)
-    print("Risultati salvati in results.json")
+
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    out_path = os.path.join(args.output, f"eval_{ts}.json")
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=2)
+    print(f"\nSalvato: {out_path}")
+
 
 if __name__ == "__main__":
     main()

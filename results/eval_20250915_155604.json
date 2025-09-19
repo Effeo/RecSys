@@ -1,0 +1,517 @@
+{
+  "timestamp": "2025-09-15T15:56:04",
+  "params": {
+    "alpha": 0.5,
+    "temperature": 0.7,
+    "K": 10,
+    "runs": 20,
+    "base_url": "http://localhost:8058",
+    "movies_file": "./data/movies_enriched.csv"
+  },
+  "users_evaluated": [
+    "Alessia",
+    "Chiara",
+    "Davide",
+    "Elena",
+    "Francesco",
+    "Gianmarco",
+    "Luca",
+    "Marco",
+    "Sara",
+    "Ulderico"
+  ],
+  "results_per_user": [
+    {
+      "user_id": "Alessia",
+      "deterministic": {
+        "K": 10,
+        "accuracy": 0.7,
+        "partial_accuracy": 0.9,
+        "diversity": {
+          "jaccard_avg": 0.5029629629629631,
+          "director_diversity": 0.9,
+          "year_variance": 17.160000000000004
+        },
+        "serendipity": 0.11786358030529301
+      },
+      "sampled": {
+        "accuracy": {
+          "mean": 0.385,
+          "std": 0.17554426642213128
+        },
+        "partial_accuracy": {
+          "mean": 0.7816666666666667,
+          "std": 0.06531524991412825
+        },
+        "serendipity": {
+          "mean": 0.22650492212046877,
+          "std": 0.05544642443940125
+        },
+        "diversity": {
+          "jaccard_avg": {
+            "mean": 0.6360925925925927,
+            "std": 0.10876320304620947
+          },
+          "director_diversity": {
+            "mean": 0.74,
+            "std": 0.10462967275611942
+          },
+          "year_variance": {
+            "mean": 45.433697530864194,
+            "std": 68.68234899374248
+          }
+        },
+        "runs": 20
+      },
+      "params": {
+        "alpha": 0.5,
+        "temperature": 0.7
+      }
+    },
+    {
+      "user_id": "Chiara",
+      "deterministic": {
+        "K": 10,
+        "accuracy": 0.2,
+        "partial_accuracy": 0.7333333333333334,
+        "diversity": {
+          "jaccard_avg": 0.6990476190476191,
+          "director_diversity": 0.7,
+          "year_variance": 36.690000000000005
+        },
+        "serendipity": 0.0536153065705481
+      },
+      "sampled": {
+        "accuracy": {
+          "mean": 0.24999999999999994,
+          "std": 0.127733274731701
+        },
+        "partial_accuracy": {
+          "mean": 0.7316666666666667,
+          "std": 0.055646125004982845
+        },
+        "serendipity": {
+          "mean": 0.12777806122718172,
+          "std": 0.03830730802656321
+        },
+        "diversity": {
+          "jaccard_avg": {
+            "mean": 0.8253955026455027,
+            "std": 0.06665562540622047
+          },
+          "director_diversity": {
+            "mean": 0.67,
+            "std": 0.16254554017744982
+          },
+          "year_variance": {
+            "mean": 89.14949999999999,
+            "std": 157.35800698691736
+          }
+        },
+        "runs": 20
+      },
+      "params": {
+        "alpha": 0.5,
+        "temperature": 0.7
+      }
+    },
+    {
+      "user_id": "Davide",
+      "deterministic": {
+        "K": 10,
+        "accuracy": 0.7,
+        "partial_accuracy": 0.8999999999999998,
+        "diversity": {
+          "jaccard_avg": 0.3185185185185186,
+          "director_diversity": 0.8,
+          "year_variance": 11.96
+        },
+        "serendipity": 0.08991162857439645
+      },
+      "sampled": {
+        "accuracy": {
+          "mean": 0.255,
+          "std": 0.13945382182304158
+        },
+        "partial_accuracy": {
+          "mean": 0.7316666666666667,
+          "std": 0.06441368493587014
+        },
+        "serendipity": {
+          "mean": 0.13215419709832593,
+          "std": 0.04174698256259965
+        },
+        "diversity": {
+          "jaccard_avg": {
+            "mean": 0.648,
+            "std": 0.11941688032890001
+          },
+          "director_diversity": {
+            "mean": 0.675,
+            "std": 0.151744244666721
+          },
+          "year_variance": {
+            "mean": 67.03649999999999,
+            "std": 71.1511248034033
+          }
+        },
+        "runs": 20
+      },
+      "params": {
+        "alpha": 0.5,
+        "temperature": 0.7
+      }
+    },
+    {
+      "user_id": "Elena",
+      "deterministic": {
+        "K": 10,
+        "accuracy": 0.9,
+        "partial_accuracy": 0.9333333333333333,
+        "diversity": {
+          "jaccard_avg": 0.3740740740740741,
+          "director_diversity": 0.8,
+          "year_variance": 3.65
+        },
+        "serendipity": 0.1182864845080475
+      },
+      "sampled": {
+        "accuracy": {
+          "mean": 0.31500000000000006,
+          "std": 0.10894228312566052
+        },
+        "partial_accuracy": {
+          "mean": 0.7233333333333334,
+          "std": 0.05084088238452818
+        },
+        "serendipity": {
+          "mean": 0.13482290103586442,
+          "std": 0.0315770531449835
+        },
+        "diversity": {
+          "jaccard_avg": {
+            "mean": 0.7476600529100529,
+            "std": 0.08602840996330957
+          },
+          "director_diversity": {
+            "mean": 0.6649999999999999,
+            "std": 0.15985190514644287
+          },
+          "year_variance": {
+            "mean": 69.725,
+            "std": 100.5593074809718
+          }
+        },
+        "runs": 20
+      },
+      "params": {
+        "alpha": 0.5,
+        "temperature": 0.7
+      }
+    },
+    {
+      "user_id": "Francesco",
+      "deterministic": {
+        "K": 10,
+        "accuracy": 0.7,
+        "partial_accuracy": 0.8999999999999998,
+        "diversity": {
+          "jaccard_avg": 0.44582010582010584,
+          "director_diversity": 0.9,
+          "year_variance": 41.24
+        },
+        "serendipity": 0.04605140076150395
+      },
+      "sampled": {
+        "accuracy": {
+          "mean": 0.15500000000000003,
+          "std": 0.11459310165698641
+        },
+        "partial_accuracy": {
+          "mean": 0.6916666666666667,
+          "std": 0.05393845312155513
+        },
+        "serendipity": {
+          "mean": 0.10762429137433216,
+          "std": 0.03694586418525892
+        },
+        "diversity": {
+          "jaccard_avg": {
+            "mean": 0.7492619047619048,
+            "std": 0.08020947535045463
+          },
+          "director_diversity": {
+            "mean": 0.72,
+            "std": 0.17350868323485927
+          },
+          "year_variance": {
+            "mean": 70.848,
+            "std": 81.16234371859119
+          }
+        },
+        "runs": 20
+      },
+      "params": {
+        "alpha": 0.5,
+        "temperature": 0.7
+      }
+    },
+    {
+      "user_id": "Gianmarco",
+      "deterministic": {
+        "K": 10,
+        "accuracy": 0.5,
+        "partial_accuracy": 0.8333333333333333,
+        "diversity": {
+          "jaccard_avg": 0.22962962962962968,
+          "director_diversity": 0.8,
+          "year_variance": 23.640000000000004
+        },
+        "serendipity": 0.19001733031004348
+      },
+      "sampled": {
+        "accuracy": {
+          "mean": 0.35000000000000003,
+          "std": 0.1468977445995038
+        },
+        "partial_accuracy": {
+          "mean": 0.7683333333333333,
+          "std": 0.05970198895665136
+        },
+        "serendipity": {
+          "mean": 0.13173585801371168,
+          "std": 0.03824991072898372
+        },
+        "diversity": {
+          "jaccard_avg": {
+            "mean": 0.6497363315696649,
+            "std": 0.07737671440423616
+          },
+          "director_diversity": {
+            "mean": 0.69,
+            "std": 0.15525869752736798
+          },
+          "year_variance": {
+            "mean": 93.48299999999999,
+            "std": 133.5040153190749
+          }
+        },
+        "runs": 20
+      },
+      "params": {
+        "alpha": 0.5,
+        "temperature": 0.7
+      }
+    },
+    {
+      "user_id": "Luca",
+      "deterministic": {
+        "K": 10,
+        "accuracy": 0.7,
+        "partial_accuracy": 0.9,
+        "diversity": {
+          "jaccard_avg": 0.4473544973544975,
+          "director_diversity": 0.9,
+          "year_variance": 7.890000000000001
+        },
+        "serendipity": 0.06002403681111311
+      },
+      "sampled": {
+        "accuracy": {
+          "mean": 0.31,
+          "std": 0.14473205733717956
+        },
+        "partial_accuracy": {
+          "mean": 0.7333333333333334,
+          "std": 0.06839855680567695
+        },
+        "serendipity": {
+          "mean": 0.1135920323967858,
+          "std": 0.025950851537425094
+        },
+        "diversity": {
+          "jaccard_avg": {
+            "mean": 0.8104603174603175,
+            "std": 0.05224942869997431
+          },
+          "director_diversity": {
+            "mean": 0.715,
+            "std": 0.18431951662948318
+          },
+          "year_variance": {
+            "mean": 82.4475,
+            "std": 102.59066326015197
+          }
+        },
+        "runs": 20
+      },
+      "params": {
+        "alpha": 0.5,
+        "temperature": 0.7
+      }
+    },
+    {
+      "user_id": "Marco",
+      "deterministic": {
+        "K": 10,
+        "accuracy": 0.7,
+        "partial_accuracy": 0.8999999999999998,
+        "diversity": {
+          "jaccard_avg": 0.4207407407407408,
+          "director_diversity": 1.0,
+          "year_variance": 1.61
+        },
+        "serendipity": 0.10756475147393443
+      },
+      "sampled": {
+        "accuracy": {
+          "mean": 0.29,
+          "std": 0.11652874052533585
+        },
+        "partial_accuracy": {
+          "mean": 0.7416666666666667,
+          "std": 0.043089733651982966
+        },
+        "serendipity": {
+          "mean": 0.133368805327722,
+          "std": 0.030631605861580938
+        },
+        "diversity": {
+          "jaccard_avg": {
+            "mean": 0.7983509700176367,
+            "std": 0.05682531025236812
+          },
+          "director_diversity": {
+            "mean": 0.705,
+            "std": 0.12763022245616643
+          },
+          "year_variance": {
+            "mean": 123.61599999999996,
+            "std": 124.62925196885274
+          }
+        },
+        "runs": 20
+      },
+      "params": {
+        "alpha": 0.5,
+        "temperature": 0.7
+      }
+    },
+    {
+      "user_id": "Sara",
+      "deterministic": {
+        "K": 10,
+        "accuracy": 1.0,
+        "partial_accuracy": 1.0,
+        "diversity": {
+          "jaccard_avg": 0.16148148148148148,
+          "director_diversity": 1.0,
+          "year_variance": 0.5599999999999999
+        },
+        "serendipity": 0.1859870050644098
+      },
+      "sampled": {
+        "accuracy": {
+          "mean": 0.43,
+          "std": 0.16575187543592473
+        },
+        "partial_accuracy": {
+          "mean": 0.785,
+          "std": 0.06880347468445884
+        },
+        "serendipity": {
+          "mean": 0.18317828269600558,
+          "std": 0.0336864671843201
+        },
+        "diversity": {
+          "jaccard_avg": {
+            "mean": 0.6639814814814816,
+            "std": 0.11150818426029713
+          },
+          "director_diversity": {
+            "mean": 0.71,
+            "std": 0.13726654823065193
+          },
+          "year_variance": {
+            "mean": 54.37349999999999,
+            "std": 82.15670644214661
+          }
+        },
+        "runs": 20
+      },
+      "params": {
+        "alpha": 0.5,
+        "temperature": 0.7
+      }
+    },
+    {
+      "user_id": "Ulderico",
+      "deterministic": {
+        "K": 10,
+        "accuracy": 1.0,
+        "partial_accuracy": 1.0,
+        "diversity": {
+          "jaccard_avg": 0.4280070546737213,
+          "director_diversity": 0.4,
+          "year_variance": 24.240000000000002
+        },
+        "serendipity": 0.04490079304534227
+      },
+      "sampled": {
+        "accuracy": {
+          "mean": 0.9099999999999999,
+          "std": 0.08522416262267903
+        },
+        "partial_accuracy": {
+          "mean": 0.9699999999999998,
+          "std": 0.02840805420755973
+        },
+        "serendipity": {
+          "mean": 0.09160217271245982,
+          "std": 0.03475600245148819
+        },
+        "diversity": {
+          "jaccard_avg": {
+            "mean": 0.8354232804232804,
+            "std": 0.06627850757995404
+          },
+          "director_diversity": {
+            "mean": 0.68,
+            "std": 0.1880649383926509
+          },
+          "year_variance": {
+            "mean": 115.31700000000001,
+            "std": 121.94047098568436
+          }
+        },
+        "runs": 20
+      },
+      "params": {
+        "alpha": 0.5,
+        "temperature": 0.7
+      }
+    }
+  ],
+  "global_aggregates": {
+    "deterministic": {
+      "accuracy": 0.71,
+      "partial_accuracy": 0.9,
+      "serendipity": 0.1014222317424632,
+      "diversity": {
+        "jaccard_avg": 0.4027636684303352,
+        "director_diversity": 0.8200000000000001,
+        "year_variance": 16.864000000000004
+      }
+    },
+    "sampled": {
+      "accuracy": 0.36500000000000005,
+      "partial_accuracy": 0.7658333333333334,
+      "serendipity": 0.1382361524002858,
+      "diversity": {
+        "jaccard_avg": 0.7364362433862435,
+        "director_diversity": 0.697,
+        "year_variance": 81.14296975308642
+      }
+    }
+  }
+}

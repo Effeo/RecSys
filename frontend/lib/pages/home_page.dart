@@ -12,9 +12,14 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
+class HomeData {
+  final String likedTitle;
+  final List<Movie> recs;
+  const HomeData({required this.likedTitle, required this.recs});
+}
+
 class _HomePageState extends State<HomePage> {
-  // Ora carichiamo: likedTitle, recs, similar, banditExploit, banditExplore
-  late Future<(String, List<Movie>, List<Movie>, List<Movie>, List<Movie>)> _futureData;
+  late Future<HomeData> _futureData;
 
   @override
   void initState() {
@@ -22,38 +27,46 @@ class _HomePageState extends State<HomePage> {
     _futureData = _load();
   }
 
-  Future<(String, List<Movie>, List<Movie>, List<Movie>, List<Movie>)> _load() async {
+  Future<HomeData> _load() async {
     // 1) preferenze utente per ricavare liked_movie
     final prefs = await ApiClient.fetchUserPreferences(widget.userId);
     final likedTitle = (prefs['liked_movie'] as String?)?.trim();
-    final seedTitle = (likedTitle == null || likedTitle.isEmpty) ? 'Toy Story' : likedTitle;
+    final seedTitle = (likedTitle == null || likedTitle.isEmpty)
+        ? 'Toy Story'
+        : likedTitle;
 
-    // 2) chiamate in parallelo
-    final recsF = ApiClient.fetchRecommendations(widget.userId);
-    final similarF = ApiClient.fetchSimilar(seedTitle);
-    final banditF = ApiClient.fetchBandit(
+    // 2) una sola chiamata all'endpoint ibrido (10 film)
+    final raw = await ApiClient.fetchRecommendations(
       widget.userId,
-      topK: 20,
-      epsilon: 0.35,
-      candidatePool: 160,
-      exploreExtra: 400,
-      seed: 42, // stabile in dev
+      useSampled: true, // false => top deterministici
     );
 
-    final recs = await recsF;
-    final similar = await similarF;
-    final (banditExploit, banditExplore) = await banditF;
+    // 3) CINTURA: filtra qualsiasi voce nulla o senza titolo
+    final List<Movie> recs = raw
+        .whereType<Movie>() // scarta eventuali null (nel caso arrivino…)
+        .where((m) => m.title.trim().isNotEmpty)
+        .toList(growable: false);
 
-    return (seedTitle, recs, similar, banditExploit, banditExplore);
+    // debug rapido: vedi cosa stai mostrando
+    // debugPrint('HYBRID MOVIES: ${recs.map((m) => m.title).toList()}');
+
+    return HomeData(likedTitle: seedTitle, recs: recs);
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _futureData = _load());
+    await _futureData;
   }
 
   void _openDetails(Movie m) {
+    // protezione extra: se mai arrivasse qualcosa di strano
+    if (m.title.trim().isEmpty) return;
     MovieDetailSheet.show(context, m, widget.userId);
   }
 
   @override
   Widget build(BuildContext context) {
-    const bg = Color(0xFF141414); // Netflix dark
+    const bg = Color(0xFF141414);
     const titleStyle = TextStyle(
       color: Colors.white,
       fontSize: 28,
@@ -75,7 +88,7 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: bg,
       body: SafeArea(
-        child: FutureBuilder<(String, List<Movie>, List<Movie>, List<Movie>, List<Movie>)>(
+        child: FutureBuilder<HomeData>(
           future: _futureData,
           builder: (context, snap) {
             if (snap.connectionState == ConnectionState.waiting) {
@@ -88,77 +101,77 @@ class _HomePageState extends State<HomePage> {
                 child: Text(
                   'Errore: ${snap.error}',
                   style: const TextStyle(color: Colors.redAccent),
+                  textAlign: TextAlign.center,
                 ),
               );
             }
-            final (likedTitle, recs, similar, banditExploit, banditExplore) =
-                snap.data ?? ('Toy Story', <Movie>[], <Movie>[], <Movie>[], <Movie>[]);
+            if (!snap.hasData) {
+              return const SizedBox.shrink();
+            }
 
-            return ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                // HEADER HERO
-                Container(
-                  height: 140,
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF1A1A1A), Color(0xFF0E0E0E)],
+            final home = snap.data!;
+            final String likedTitle = home.likedTitle;
+            final List<Movie> recs = home.recs;
+
+            final Widget section = recs.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text(
+                      'Nessun consiglio disponibile al momento.',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                  )
+                : SectionRow(
+                    title: 'Consigliati per te',
+                    titleStyle: sectionTitleStyle,
+                    movies: recs, // List<Movie> pulita (no null)
+                    onTapMovie: _openDetails,
+                    showArrows: true,
+                    showExploreBadge: false,
+                  );
+
+            return RefreshIndicator(
+              onRefresh: _refresh,
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  // HEADER HERO
+                  Container(
+                    height: 140,
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF1A1A1A), Color(0xFF0E0E0E)],
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Benvenuto, ${widget.userId}',
+                            style: titleStyle,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            likedTitle.isNotEmpty
+                                ? 'Consigli basati anche su: $likedTitle'
+                                : 'Scopri titoli su misura e novità',
+                            style: subtitleStyle,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Benvenuto, ${widget.userId}', style: titleStyle),
-                        const SizedBox(height: 8),
-                        Text(
-                          likedTitle.isNotEmpty
-                              ? 'Consigli basati anche su: $likedTitle'
-                              : 'Scopri titoli su misura e novità',
-                          style: subtitleStyle,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
+                  const SizedBox(height: 8),
 
-                // baseline
-                SectionRow(
-                  title: 'Consigliati per te',
-                  titleStyle: sectionTitleStyle,
-                  movies: recs,
-                  onTapMovie: _openDetails,
-                  showArrows: true,
-                  showExploreBadge: true, // innocuo (nessuno è explore qui)
-                ),
+                  section,
 
-                // similar by dynamic title
-                SectionRow(
-                  title: 'Perché ti piace $likedTitle',
-                  titleStyle: sectionTitleStyle,
-                  movies: similar,
-                  onTapMovie: _openDetails,
-                  showArrows: true,
-                ),
-
-                // ====== SEZIONE BANDIT (esplorazione) ======
-                const SizedBox(height: 8),
-                SectionRow(
-                  title: 'Esplora (novità)',
-                  titleStyle: sectionTitleStyle,
-                  accentColor: const Color(0xFFE50914), // rosso Netflix
-                  movies: banditExplore,
-                  onTapMovie: _openDetails,
-                  showArrows: true,
-                  showExploreBadge: true, // badge “NOVITÀ” sugli explore
-                ),
-
-                const SizedBox(height: 28),
-              ],
+                  const SizedBox(height: 28),
+                ],
+              ),
             );
           },
         ),

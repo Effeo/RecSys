@@ -1,9 +1,10 @@
 import pandas as pd
 import json
 import numpy as np
-from typing import Dict, Any
-import config
-import random
+from typing import Dict, Any, Optional
+from config import *
+from sklearn.decomposition import TruncatedSVD
+
 
 # ========================
 # Helper
@@ -11,25 +12,25 @@ import random
 def load_users() -> Dict[str, Any]:
     """
     Carica il dizionario degli utenti (utente_id -> informazioni utente)
-    dal file JSON specificato in config.USERS_FILE.
+    dal file JSON specificato in USERS_FILE.
 
     Se il file non esiste, restituisce un dizionario vuoto.
     """
-    if config.USERS_FILE.exists():
-        with open(config.USERS_FILE, "r", encoding="utf-8") as f:
+    if USERS_FILE.exists():
+        with open(USERS_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     return {}
 
 def save_users(users: Dict[str, Any]):
     """
     Salva il dizionario degli utenti (utente_id -> informazioni utente)
-    nel file JSON specificato in config.USERS_FILE.
+    nel file JSON specificato in USERS_FILE.
 
     Se il file non esiste, viene creato.
 
     :param users: dizionario degli utenti
     """
-    with open(config.USERS_FILE, "w", encoding="utf-8") as f:
+    with open(USERS_FILE, "w", encoding="utf-8") as f:
         json.dump(users, f, indent=2, ensure_ascii=False)
 
 def clean_results(df_in: pd.DataFrame) -> list[dict]:
@@ -49,286 +50,211 @@ def clean_results(df_in: pd.DataFrame) -> list[dict]:
     return df2.to_dict(orient="records")
 
 # ========================
-# Bandit helpers
-# ========================
-def is_novelty(row: pd.Series, pref: Dict[str, Any]) -> tuple[bool, str]:
-    """
-    Verifica se un film è una novità rispetto alle preferenze utente.
-
-    La novità viene valutata in base ai seguenti criteri:
-    - il film non ha generi che interessano l'utente (se l'utente ne ha specificati);
-    - il regista non è tra i preferiti dell'utente;
-    - la durata del film è fuori dall'intervallo di tolleranza dell'utente
-      (se l'utente ha specificato una durata preferita).
-
-    Se il film non soddisfa alcuno di questi criteri, non è considerato una novità.
-    In caso contrario, restituisce True e una stringa con le ragioni per cui
-    il film è stato considerato una novità.
-
-    :param row: riga del dataframe con le informazioni sul film
-    :param pref: dizionario con le preferenze dell'utente
-    :return: una tupla con un booleano che indica se il film è una novità
-             e una stringa con le ragioni della novità (se presente)
-    """
-    reasons = []
-    g_des = [g for g in (pref.get("generi_desiderati") or []) if g in row.index]
-    fav_dirs = set(pref.get("favorite_directors") or [])
-
-    # Match generi
-    has_genre_match = False
-    if g_des:
-        has_genre_match = (int(row[g_des].sum()) > 0)
-
-    # Regista fuori preferiti?
-    dir_off = (len(fav_dirs) > 0 and row.get("director") not in fav_dirs)
-
-    # Runtime fuori tolleranza?
-    rt_off = False
-    if pref.get("preferred_runtime") is not None and "runtime" in row.index and pd.notna(row["runtime"]):
-        tol = pref.get("tolleranza_runtime", 15)
-        rt_off = abs(row["runtime"] - pref["preferred_runtime"]) > tol
-
-    # Logica di novità
-    if g_des:
-        is_novel = (not has_genre_match) and (dir_off or rt_off)
-        if not has_genre_match:
-            reasons.append("genere fuori profilo")
-    else:
-        # se l'utente non ha generi desiderati, basiamoci su regista/runtime
-        is_novel = (dir_off or rt_off)
-
-    if dir_off:
-        reasons.append("regista fuori preferiti")
-    if rt_off:
-        reasons.append("runtime fuori tolleranza")
-
-    return is_novel, (", ".join(reasons) if reasons else "in linea con i gusti")
-
-
-# ========================
-# POOLS
-# ========================
-def _constraint_pool(df_all: pd.DataFrame, pref: Dict[str, Any], k: int) -> pd.DataFrame:
-    """
-    Ritorna i top-k film raccomandati per le preferenze utente, senza alcuna novità.
-    Questo è l'exploit pool per il bandit.
-
-    :param df_all: dataframe di tutti i film, con colonne "movie_title" e "release_date"
-    :param pref: dizionario con le preferenze dell'utente
-    :param k: numero di film da restituire
-    :return: dataframe con i top-k film, con colonna "score"
-    """
-    return recommend_movies(df_all, pref, top_k=k).copy()
-
-def _year_filtered(df_all: pd.DataFrame, pref: Dict[str, Any]) -> pd.DataFrame:
-    """
-    Ritorna un dataframe con i film che rispettano la minima release year richiesta.
-
-    :param df_all: dataframe di tutti i film, con colonna "release_date"
-    :param pref: dizionario con le preferenze dell'utente
-    :return: dataframe con i film che rispettano la minima release year richiesta
-    """
-    df_y = df_all[df_all["release_date"].dt.year >= pref.get("min_release_year", 0)].copy()
-    return df_y
-
-def build_pools(df_all: pd.DataFrame,
-                pref: Dict[str, Any],
-                candidate_pool: int = 100,
-                explore_extra: int = 200) -> tuple[pd.DataFrame, pd.DataFrame]:
-
-    """
-    Costruisce i due pool per il bandit:
-    1. exploit_pool: top-k film raccomandati per le preferenze utente, senza alcuna novità
-    2. explore_pool: candidate pool più largo, con film che rispettano la minima release year
-       richiesta ma non sono in exploit_pool, contrassegnati per la novità
-
-    :param df_all: dataframe di tutti i film, con colonne "movie_title" e "release_date"
-    :param pref: dizionario con le preferenze dell'utente
-    :param candidate_pool: numero di film da restituire come exploit_pool
-    :param explore_extra: numero di film extra da selezionare per explore_pool
-    :return: due dataframe, exploit_pool e explore_pool
-    """
-    exploit_pool = _constraint_pool(df_all, pref, k=max(candidate_pool, 20))
-    if exploit_pool.empty:
-        return exploit_pool, exploit_pool  # entrambi vuoti
-
-    # Calcola novelty su exploit_pool (ci serve dopo, ma cloniamo)
-    ex = exploit_pool.copy()
-
-    # Costruiamo un explore candidati “larghi”
-    base_wide = _year_filtered(df_all, pref)
-    # rimuovi quelli già in exploit
-    base_wide = base_wide[~base_wide["movie_id"].isin(ex["movie_id"])].copy()
-
-    # contrassegna novelty su base_wide
-    nov_flags, nov_reasons = zip(*[is_novelty(r, pref) for _, r in base_wide.iterrows()]) if not base_wide.empty else ([], [])
-    if not base_wide.empty:
-        base_wide["novel"] = list(nov_flags)
-        base_wide["novelty_reason"] = list(nov_reasons)
-
-    # explore = davvero fuori profilo
-    explore_pool = base_wide[base_wide["novel"]].copy() if not base_wide.empty else base_wide
-
-    # fallback se explore è troppo piccolo
-    MIN_EXPLORE = min(50, explore_extra)
-    if explore_pool.shape[0] < MIN_EXPLORE:
-        # 1) aggiungi dalla coda dell'exploit (punteggi più bassi)
-        tail = ex.sort_values("score", ascending=True).head(MIN_EXPLORE)
-        tail = tail[~tail["movie_id"].isin(explore_pool["movie_id"] if not explore_pool.empty else [])]
-        explore_pool = pd.concat([explore_pool, tail], ignore_index=True) if not explore_pool.empty else tail.copy()
-
-        # 2) aggiungi random dal base_wide (stessa epoca)
-        if not base_wide.empty:
-            need = MIN_EXPLORE - explore_pool.shape[0]
-            if need > 0:
-                explore_pool = pd.concat(
-                    [explore_pool, base_wide.sample(n=min(need, base_wide.shape[0]), random_state=None)],
-                    ignore_index=True
-                )
-
-    # assicura disgiunzione
-    explore_pool = explore_pool[~explore_pool["movie_id"].isin(ex["movie_id"])]
-    return ex.reset_index(drop=True), explore_pool.reset_index(drop=True)
-
-
-# ========================
-# ε-GREEDY SU POOLS DISGIUNTI
-# ========================
-def epsilon_greedy_from_pools(exploit_pool: pd.DataFrame,
-                              explore_pool: pd.DataFrame,
-                              pref: Dict[str, Any],
-                              top_k: int = 5,
-                              epsilon: float = 0.2,
-                              seed: int | None = None) -> pd.DataFrame:
-    """
-    Ritorna un dataframe con le raccomandazioni per l'utente, usando ε-greedy tra due pool disgiunti:
-    1. exploit_pool: top-k film raccomandati per le preferenze utente, senza alcuna novità
-    2. explore_pool: candidate pool più largo, con film che rispettano la minima release year
-       richiesta ma non sono in exploit_pool, contrassegnati per la novità
-
-    :param exploit_pool: dataframe con i top-k film raccomandati per le preferenze utente
-    :param explore_pool: dataframe con i film che rispettano la minima release year richiesta
-    :param pref: dizionario con le preferenze dell'utente
-    :param top_k: numero di film da restituire
-    :param epsilon: probabilità di esplorazione
-    :param seed: seed per la generazione casuale
-    :return: dataframe con le raccomandazioni per l'utente, con colonne "score", "novel", "novelty_reason" e "pick_strategy"
-    """
-    if seed is not None:
-        random.seed(seed)
-        np.random.seed(seed)
-
-    if exploit_pool.empty and explore_pool.empty:
-        return exploit_pool.head(0)
-
-    # ordina lo sfruttamento per score
-    ex = exploit_pool.sort_values("score", ascending=False).copy()
-    ex_ids = set()
-    rows = []
-
-    # calcola novelty su entrambi i pool (se non presente)
-    def _ensure_novelty(df_in: pd.DataFrame) -> pd.DataFrame:
-        """
-        Ritorna il dataframe con colonne "novel" e "novelty_reason" aggiunte, se non presenti.
-        Le colonne sono calcolate chiamando la funzione is_novelty(row, pref) per ogni riga del dataframe.
-        La funzione restituisce un dataframe copiato, con le nuove colonne aggiunte.
-        """
-    
-        if "novel" in df_in.columns and "novelty_reason" in df_in.columns:
-            return df_in
-        flags, reasons = zip(*[is_novelty(r, pref) for _, r in df_in.iterrows()]) if not df_in.empty else ([], [])
-        out = df_in.copy()
-        if not df_in.empty:
-            out["novel"] = list(flags)
-            out["novelty_reason"] = list(reasons)
-        return out
-
-    ex = _ensure_novelty(ex)
-    xp = _ensure_novelty(explore_pool)
-
-    # indici di scorrimento per evitare ripetizioni
-    ex_idx = 0
-
-    for _ in range(top_k):
-        pick_explore = (random.random() < epsilon) and not xp.empty
-        chosen = None
-        strategy = "explore" if pick_explore else "exploit"
-
-        if pick_explore:
-            # scegli un elemento novel NON ancora preso
-            xp_available = xp[~xp["movie_id"].isin(ex_ids)]
-            if not xp_available.empty:
-                chosen = xp_available.sample(n=1, random_state=None).iloc[0]
-            else:
-                pick_explore = False  # fallback a exploit
-
-        if not pick_explore:
-            while ex_idx < len(ex) and ex.iloc[ex_idx]["movie_id"] in ex_ids:
-                ex_idx += 1
-            if ex_idx < len(ex):
-                chosen = ex.iloc[ex_idx]
-                ex_idx += 1
-
-        if chosen is None:
-            break
-
-        ex_ids.add(int(chosen["movie_id"]))
-        row = chosen.copy()
-        row["pick_strategy"] = strategy
-        rows.append(row)
-
-    return pd.DataFrame(rows)
-
-# ========================
 # Raccomandazioni content-based per utente
 # ========================
-def recommend_movies(df, pref, top_k=5):
-    """
-    Raccomandazioni content-based per utente.
+def recommend_movies(df_movies: pd.DataFrame, utente_id: str, pref: dict, top_k: int = TOP_K):
+    df_f = df_movies.copy()
+    score = pd.Series(0.0, index=df_f.index, dtype=float)
 
-    La funzione filtra i film con anno di uscita >= min_release_year e
-    rimuove quelli con generi vietati (se presenti nel dataset). Quindi,
-    calcola un punteggio per ogni film come somma dei generi desiderati
-    e bonus per film premiati, registi graditi e durata vicina a quella
-    preferita (se specificate). I film vengono infine ordinati per punteggio
-    decrescente e restituiti i primi top_k.
-
-    :param df: dataframe con i film
-    :param pref: dizionario con le preferenze dell'utente
-    :param top_k: numero di film da restituire
-    :return: dataframe con i top_k film raccomandati, con colonna "score"
-    """
-    df_f = df[df["release_date"].dt.year >= pref["min_release_year"]].copy()
-
-    # rimuovi film con generi vietati (se presenti nel dataset)
-    if pref.get("generi_vietati"):
-        cols_vietati = [g for g in pref["generi_vietati"] if g in df_f.columns]
-        if cols_vietati:
-            penalita_genere = df_f[cols_vietati].sum(axis=1)
-            df_f = df_f[penalita_genere == 0]
-
-    # punteggio base sui generi desiderati
-    score = 0
+    # Generi desiderati (bonus)
     if pref.get("generi_desiderati"):
-        cols_desid = [g for g in pref["generi_desiderati"] if g in df_f.columns]
-        if cols_desid:
-            score = df_f[cols_desid].sum(axis=1)
+        cols = [g for g in pref["generi_desiderati"] if g in df_f.columns]
+        if cols:
+            score += df_f[cols].fillna(0).sum(axis=1)
 
-    # bonus premi
-    if pref.get("prefer_award_winning", False) and "awards" in df_f.columns:
-        score = score + df_f["awards"] * config.AWARD_WEIGHT
+    # Premi (bonus)
+    if pref.get("prefer_award_winning", False):
+        awarded = (df_f["awards"].fillna(0) > 0).astype(int)
+        score += awarded * AWARD_WEIGHT
 
-    # bonus registi
+    # Registi graditi (bonus)
     if pref.get("favorite_directors"):
-        liked_dir = df_f["director"].isin(pref["favorite_directors"]).astype(int)
-        score = score + liked_dir * config.DIRECTOR_WEIGHT
+        liked_dir = df_f.get("director", pd.Series(index=df_f.index)).isin(pref["favorite_directors"]).fillna(False).astype(int)
+        score += liked_dir * DIRECTOR_WEIGHT
 
-    # bonus durata
-    if pref.get("preferred_runtime") is not None and "runtime" in df_f.columns:
-        delta = (df_f["runtime"] - pref["preferred_runtime"]).abs()
-        near = (delta <= pref.get("tolleranza_runtime", 15)).astype(int)
-        score = score + near * config.RUNTIME_WEIGHT
+    # Runtime: bonus dentro tolleranza, malus fuori
+    if pref.get("preferred_runtime") is not None:
+        tol = max(0, pref.get("tolleranza_runtime", 15))
+        runtime = pd.to_numeric(df_f.get("runtime"), errors="coerce")
+        delta = (runtime - pref["preferred_runtime"]).abs()
 
-    df_f["score"] = score
-    recs = df_f.sort_values(by="score", ascending=False).head(top_k)
-    return recs
+        inside = (delta <= tol).fillna(False).astype(int)
+        score += inside * RUNTIME_WEIGHT
+
+        excess = (delta - tol).clip(lower=0).fillna(0)
+        denom = tol if tol > 0 else 1
+        scale = (excess / denom).clip(0, 3)
+        score -= scale * RUNTIME_OUTSIDE_MALUS
+
+        if MISSING_RUNTIME_MALUS > 0:
+            score -= runtime.isna().astype(int) * MISSING_RUNTIME_MALUS
+
+    # Generi vietati (malus)
+    if pref.get("generi_vietati"):
+        cols_forbidden = [g for g in pref["generi_vietati"] if g in df_f.columns]
+        if cols_forbidden:
+            present_forbidden = df_f[cols_forbidden].fillna(0).sum(axis=1)
+            score -= present_forbidden * FORBIDDEN_GENRE_MALUS
+
+    # Anno: malus sotto soglia (nessun drop)
+    if pref.get("min_release_year") is not None:
+        years = df_f["release_date"].dt.year
+        score -= years.isna().astype(float) * MISSING_YEAR_MALUS
+        diff = (pref["min_release_year"] - years.fillna(pref["min_release_year"])).clip(lower=0)
+        score -= diff * YEAR_BELOW_MALUS_PER_YEAR
+
+    df_f["score"] = score.fillna(0.0)
+
+    # Ordina per score constraint (il taglio top_k lo faremo dopo sul campionamento)
+    recs = df_f.sort_values(by="score", ascending=False)
+
+    # Colonne di output suggerite
+    cols_out = ["movie_id", "movie_title", "release_date", "score"]
+    if pref.get("generi_desiderati"):
+        cols_out += [g for g in pref["generi_desiderati"] if g in df_f.columns]
+    if pref.get("prefer_award_winning"):
+        cols_out.append("awards")
+    if pref.get("favorite_directors"):
+        cols_out.append("director")
+    if pref.get("preferred_runtime") is not None:
+        cols_out.append("runtime")
+    if pref.get("generi_vietati"):
+        cols_out += [g for g in pref["generi_vietati"] if g in df_f.columns]
+
+    return recs, cols_out
+
+def normalize_prefs(p: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    p = dict(p or {})
+    out = {**DEFAULT_PREFS, **p}
+
+    # numeri
+    try:
+        out["min_release_year"] = int(out.get("min_release_year", 0) or 0)
+    except Exception:
+        out["min_release_year"] = 0
+
+    try:
+        pr = out.get("preferred_runtime", None)
+        out["preferred_runtime"] = None if pr in (None, "", "null") else int(pr)
+    except Exception:
+        out["preferred_runtime"] = None
+
+    try:
+        out["tolleranza_runtime"] = int(out.get("tolleranza_runtime", 0) or 0)
+    except Exception:
+        out["tolleranza_runtime"] = 0
+
+    # liste
+    for k in ("generi_desiderati", "generi_vietati", "favorite_directors"):
+        v = out.get(k, [])
+        if isinstance(v, (list, tuple)):
+            out[k] = [str(x) for x in v]
+        else:
+            out[k] = []
+
+    # booleano
+    out["prefer_award_winning"] = bool(out.get("prefer_award_winning", False))
+    return out
+
+
+def collaborative_filtering_series(
+    ratings_path: str,
+    movies_path: str,
+    liked_movie_title: str,
+    max_components: int = 30,
+) -> pd.Series:
+    """Ritorna una Series 'cf_score' indicizzata per movie_id con le correlazioni
+    rispetto al film 'liked_movie_title'. Se il film non è trovato, Series vuota.
+    """
+    ratings = pd.read_csv(ratings_path)[["user_id", "movie_id", "rating"]]
+    movies  = pd.read_csv(movies_path)[["movie_id", "movie_title"]].drop_duplicates()
+
+    like_rows = movies.loc[movies["movie_title"] == liked_movie_title, "movie_id"]
+    if like_rows.empty:
+        return pd.Series(dtype=float, name="cf_score")
+    liked_id = int(like_rows.iloc[0])
+
+    merged  = ratings.merge(movies, on="movie_id", how="inner")
+    utility = merged.pivot_table(values="rating", index="user_id", columns="movie_id", fill_value=0)
+    if utility.shape[1] < 2:
+        return pd.Series(dtype=float, name="cf_score")
+
+    X = utility.T  # (n_movies x n_users)
+    n_comp = max(2, min(max_components, min(X.shape) - 1))
+    svd = TruncatedSVD(n_components=n_comp, random_state=42)
+    Z = svd.fit_transform(X)  # (n_movies x n_comp)
+
+    corr = np.corrcoef(Z)  # (n_movies x n_movies)
+    movie_ids = list(utility.columns)
+    try:
+        i = movie_ids.index(liked_id)
+    except ValueError:
+        return pd.Series(dtype=float, name="cf_score")
+
+    cf_vec = pd.Series(corr[i], index=movie_ids, name="cf_score")
+    return cf_vec
+
+
+def add_cf_and_sum(
+    df_in: pd.DataFrame,
+    ratings_path: str,
+    movies_path: str,
+    liked_movie_title: str,
+    constraint_score_col: str = "score",
+    alpha_cf: float = ALPHA_CF,
+) -> pd.DataFrame:
+    """Allinea CF per movie_id e somma al punteggio constraint in df_in.
+    Ritorna df con colonne aggiunte: 'cf_score', 'hybrid_score'.
+    """
+    if "movie_id" not in df_in.columns:
+        raise ValueError("df deve contenere la colonna 'movie_id'.")
+
+    cf_series = collaborative_filtering_series(ratings_path, movies_path, liked_movie_title)
+    df_out = df_in.copy()
+    df_out = df_out.merge(cf_series, how="left", left_on="movie_id", right_index=True)
+    df_out["cf_score"] = pd.to_numeric(df_out["cf_score"], errors="coerce").fillna(0.0)
+
+    base = pd.to_numeric(df_out[constraint_score_col], errors="coerce").fillna(0.0)
+    df_out["hybrid_score"] = base + alpha_cf * df_out["cf_score"]
+    return df_out
+
+def softmax_from_scores(scores: pd.Series, temperature: float = 1.0) -> pd.Series:
+    """Softmax numericamente stabile: exp((s - max)/T) / sum(exp(...)).
+    Gestisce NaN e casi degeneri (tutti uguali). Ritorna una Series con somma = 1.
+    """
+    s = pd.to_numeric(scores, errors="coerce").fillna(0.0)
+    T = max(1e-8, float(temperature))
+    s_shift = s - s.max()
+    exps = np.exp(s_shift / T)
+    # Protezione da overflow/underflow estrema
+    exps = np.where(np.isfinite(exps), exps, 0.0)
+    total = exps.sum()
+    if total <= 0.0:
+        # fallback: distribuzione uniforme
+        p = np.ones_like(exps) / len(exps) if len(exps) > 0 else np.array([])
+    else:
+        p = exps / total
+    return pd.Series(p, index=s.index, name="prob")
+
+
+def sample_by_softmax(df_in: pd.DataFrame,
+                      score_col: str = "hybrid_score",
+                      n: int = TOP_K,
+                      temperature: float = TEMPERATURE,
+                      seed: int | None = RANDOM_SEED,
+                      replace: bool = False) -> pd.DataFrame:
+    """Calcola softmax(score_col) -> prob e campiona n righe secondo quella distribuzione.
+    Ritorna il sotto-DataFrame campionato con colonna 'prob' inclusa.
+    """
+    rng = np.random.default_rng(seed)
+    probs = softmax_from_scores(df_in[score_col], temperature=temperature)
+    # Se tutte le prob sono ~0 per numerica, ricalcoliamo uniformi
+    if not np.isfinite(probs.values).all() or probs.sum() <= 0:
+        probs = pd.Series(np.ones(len(df_in)) / len(df_in), index=df_in.index, name="prob")
+
+    n_eff = min(n, len(df_in))
+    chosen_idx = rng.choice(df_in.index.values, size=n_eff, replace=replace, p=probs.loc[df_in.index].values)
+    out = df_in.loc[chosen_idx].copy()
+    out["prob"] = probs.loc[chosen_idx].values
+    # Ordiniamo per probabilità decrescente solo per leggibilità
+    return out.sort_values("prob", ascending=False)
