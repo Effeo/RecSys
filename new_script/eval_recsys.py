@@ -46,7 +46,10 @@ def infer_user_prefs(user_train: pd.DataFrame, movies_meta: pd.DataFrame) -> Dic
         return {}
 
     # Generi (se colonne presenti)
-    genre_cols = [c for c in movies_meta.columns if c not in ["movie_id", "movie_title", "runtime", "director", "awards", "release_date"]]
+    metadata_cols = ["movie_id", "movie_title", "runtime", "director", "awards", "release_date", "video_release_date", "IMDb_URL", "unknown", ""]
+
+    genre_cols = [c for c in movies_meta.columns if c not in metadata_cols]
+
     top_genres = []
     if genre_cols:
         genre_sums = liked_meta[genre_cols].sum().sort_values(ascending=False)
@@ -278,24 +281,24 @@ class HybridEvaluator:
 if __name__ == "__main__":
     data_dir = Path("../data") 
     
-    # Dummy data generation (Rimuovi se hai i file veri)
-    if not (data_dir / "ratings.csv").exists():
-        print("WARNING: Creating dummy data.")
-        data_dir.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame({
-            "user_id": np.random.randint(1, 10, 200),
-            "movie_id": np.random.randint(1, 20, 200),
-            "rating": np.random.randint(3, 6, 200), # High ratings for easier debug
-            "timestamp": range(200)
-        }).to_csv(data_dir / "ratings.csv", index=False)
+    # # Dummy data generation (Rimuovi se hai i file veri)
+    # if not (data_dir / "ratings.csv").exists():
+    #     print("WARNING: Creating dummy data.")
+    #     data_dir.mkdir(parents=True, exist_ok=True)
+    #     pd.DataFrame({
+    #         "user_id": np.random.randint(1, 10, 200),
+    #         "movie_id": np.random.randint(1, 20, 200),
+    #         "rating": np.random.randint(3, 6, 200), # High ratings for easier debug
+    #         "timestamp": range(200)
+    #     }).to_csv(data_dir / "ratings.csv", index=False)
         
-        pd.DataFrame({
-            "movie_id": range(1, 21),
-            "movie_title": [f"Movie {i}" for i in range(1, 21)],
-            "runtime": np.random.randint(80, 180, 20),
-            "Action": np.random.randint(0, 2, 20),
-            "Drama": np.random.randint(0, 2, 20)
-        }).to_csv(data_dir / "movies.csv", index=False)
+    #     pd.DataFrame({
+    #         "movie_id": range(1, 21),
+    #         "movie_title": [f"Movie {i}" for i in range(1, 21)],
+    #         "runtime": np.random.randint(80, 180, 20),
+    #         "Action": np.random.randint(0, 2, 20),
+    #         "Drama": np.random.randint(0, 2, 20)
+    #     }).to_csv(data_dir / "movies.csv", index=False)
 
-    evaluator = HybridEvaluator(data_dir / "ratings.csv", data_dir / "movies.csv")
+    evaluator = HybridEvaluator(data_dir / "ratings.csv", data_dir / "movies_enriched.csv")
     evaluator.run_evaluation()
