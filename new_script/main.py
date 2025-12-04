@@ -4,11 +4,16 @@ import datetime
 from pathlib import Path
 from config import Config
 from evaluator import HybridEvaluator
+import pandas as pd
 
 def run_experiment(mode: str):
     data_dir = Path("../data")
     configs_to_run = []
     experiment_results = []
+    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    json_filename = f"results_batteries_{ts}.json"
+    csv_filename = f"results_batteries_{ts}.csv"
+
 
     if mode == "test":
         print(">>> TEST MODE (Smoke Test) <<<")
@@ -16,7 +21,7 @@ def run_experiment(mode: str):
         configs_to_run.append(Config(name="QuickTest_Smoke", verbose_users=1, top_k=5))
         user_limit = 5
     else:
-        print(">>> FULL GRID SEARCH: EXTENDED BATTERY (7 GROUPS) <<<")
+        print(">>> FULL GRID SEARCH: EXTENDED BATTERY <<<")
         user_limit = None 
         
         # ==============================================================================
@@ -196,6 +201,11 @@ def run_experiment(mode: str):
 
     # --- EXECUTION LOOP ---
     for i, config in enumerate(configs_to_run):
+
+        # Skip all configs except the first two (DEBUG)
+        if i!=1 and i!=2:
+            continue
+
         print(f"\n[{datetime.datetime.now().strftime('%H:%M:%S')}] ({i+1}/{len(configs_to_run)}) Running {config.name}...")
         
         try:
@@ -212,30 +222,54 @@ def run_experiment(mode: str):
                     "diversity": float(results_df['diversity'].mean()),
                     "hits": float(results_df['hits'].mean())
                 }
-                # Print compatto per monitoraggio
-                print(f"   -> Prec@K: {metrics['precision']:.4f} | Nov: {metrics['novelty']:.2f} | Div: {metrics['diversity']:.2f}")
                 
+                print(f"   -> MSE: {metrics['mse']:.4f} | MAE: {metrics['mae']:.4f} | Prec@K: {metrics['precision']:.4f} | Recall: {metrics['recall']:.4f} | Nov: {metrics['novelty']:.2f} | Div: {metrics['diversity']:.2f} | Hits: {metrics['hits']:.2f}")
+                
+                # Aggiungiamo alla lista in memoria
                 experiment_results.append({
                     "config_name": config.name,
                     "metrics": metrics,
                     "params": {k:v for k,v in config.__dict__.items() if not k.startswith('_')}
                 })
+
+                # --- SALVATAGGIO INCREMENTALE (JSON + CSV) ---
+                if mode != "test":
+                    try:
+                        # 1. Salva JSON (Backup raw)
+                        with open(json_filename, "w") as f: 
+                            json.dump(experiment_results, f, indent=4)
+                        
+                        # 2. Crea e Salva CSV (Formattato e Pulito)
+                        # json_normalize "appiattisce" metrics e params in colonne
+                        df_results = pd.json_normalize(experiment_results)
+                        
+                        # Pulizia Nomi Colonne (Opzionale ma consigliato per leggibilità)
+                        df_results.columns = df_results.columns.str.replace("metrics.", "", regex=False)
+                        df_results.columns = df_results.columns.str.replace("params.", "p_", regex=False)
+                        
+                        # Riordino Colonne: Mettiamo Name e Metriche all'inizio
+                        cols = list(df_results.columns)
+                        priority_cols = ['config_name', 'mse', 'precision', 'recall', 'novelty', 'diversity']
+                        # Mettiamo prima le priority (se esistono), poi il resto
+                        final_order = [c for c in priority_cols if c in cols] + [c for c in cols if c not in priority_cols]
+                        df_results = df_results[final_order]
+
+                        # Scrittura su disco
+                        df_results.to_csv(csv_filename, index=False)
+                        
+                    except Exception as save_err:
+                        print(f"   -> WARNING: Could not save progress: {save_err}")
+
             else:
                 print("   -> WARNING: No results generated (Empty DataFrame).")
                 
         except Exception as e:
             print(f"   -> ERROR in {config.name}: {e}")
 
-    # --- SAVE RESULTS ---
-    if mode != "test" and experiment_results:
-        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"results_batteries_{ts}.json"
-        with open(filename, "w") as f: 
-            json.dump(experiment_results, f, indent=4)
-        print(f"\n>>> Experiment Complete. Results saved to {filename} <<<")
+    print(f"\n>>> Experiment Complete. Results saved in {csv_filename} <<<")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=["test", "full"], default="full", help="Use 'test' for quick check, 'full' for complete grid search.")
+    parser.add_argument("--mode", choices=["test", "full"], default="full")
     args = parser.parse_args()
     run_experiment(args.mode)
