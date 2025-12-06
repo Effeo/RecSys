@@ -34,12 +34,12 @@ def run_experiment(mode: str):
         # - svd_components: Risoluzione della mappa utenti (Bassa=Macro gusti, Alta=Dettagli).
         # ==============================================================================
         configs_to_run.extend([
-            Config(name="G1_PureContent", alpha_cf=0.0),            # Solo Content (Safe, ma bolla)
-            Config(name="G1_ContentDominant", alpha_cf=0.2),        # Mix sbilanciato su Content
-            Config(name="G1_Balanced", alpha_cf=0.5),               # Mix 50/50
-            Config(name="G1_CFDominant", alpha_cf=0.8),             # Mix sbilanciato su CF (Voti utenti pesano di più)
-            Config(name="G1_PureCF", alpha_cf=1.0),                 # Solo CF (Max Serendipity, rischio Cold Start)
-            Config(name="G1_ComplexCF", alpha_cf=0.8, svd_components=100), # CF ad alta risoluzione (rischio Overfitting)
+            Config(name="G1_PureContent", alpha_cf=0.0),            # Usa i nuovi pesi ALTI di default
+            Config(name="G1_ContentDominant", alpha_cf=0.2),
+            Config(name="G1_Balanced", alpha_cf=0.5),
+            Config(name="G1_CFDominant", alpha_cf=0.8),
+            Config(name="G1_PureCF", alpha_cf=1.0),                 # Ignora i pesi content
+            Config(name="G1_ComplexCF", alpha_cf=0.8, svd_components=100),
         ])
 
         # ==============================================================================
@@ -54,12 +54,12 @@ def run_experiment(mode: str):
         # ==============================================================================
         base_s = 0.4
         configs_to_run.extend([
-            Config(name="G2_Deterministic", alpha_cf=base_s, use_probabilistic_sampling=False), # Baseline (Argmax)
-            Config(name="G2_Conservative", alpha_cf=base_s, use_probabilistic_sampling=True, sampling_top_k_pool=20, temperature=0.5), # Poco rischio, poca varietà
-            Config(name="G2_Balanced", alpha_cf=base_s, use_probabilistic_sampling=True, sampling_top_k_pool=50, temperature=1.0),     # Standard
-            Config(name="G2_Adventurous", alpha_cf=base_s, use_probabilistic_sampling=True, sampling_top_k_pool=100, temperature=1.5), # Alta variabilità
-            Config(name="G2_Chaos", alpha_cf=base_s, use_probabilistic_sampling=True, sampling_top_k_pool=200, temperature=3.0),       # Rischio massimo (High Diversity)
-            Config(name="G2_DeepCatalog", alpha_cf=base_s, use_probabilistic_sampling=True, sampling_top_k_pool=None, temperature=0.2),# Pesca su tutto, ma con temp bassa
+            Config(name="G2_Deterministic", alpha_cf=base_s, use_probabilistic_sampling=False),
+            Config(name="G2_Conservative", alpha_cf=base_s, use_probabilistic_sampling=True, sampling_top_k_pool=20, temperature=0.5),
+            Config(name="G2_Balanced", alpha_cf=base_s, use_probabilistic_sampling=True, sampling_top_k_pool=50, temperature=1.0),
+            Config(name="G2_Adventurous", alpha_cf=base_s, use_probabilistic_sampling=True, sampling_top_k_pool=100, temperature=1.5),
+            Config(name="G2_Chaos", alpha_cf=base_s, use_probabilistic_sampling=True, sampling_top_k_pool=200, temperature=3.0),
+            Config(name="G2_DeepCatalog", alpha_cf=base_s, use_probabilistic_sampling=True, sampling_top_k_pool=None, temperature=0.2),
         ])
 
         # ==============================================================================
@@ -70,11 +70,11 @@ def run_experiment(mode: str):
         # - popularity_weight: Bonus aggiunto agli item globalmente famosi.
         # ==============================================================================
         configs_to_run.extend([
-            Config(name="G3_NoBias", alpha_cf=0.3, use_popularity_bias=False), # Purista
-            Config(name="G3_Subtle", alpha_cf=0.3, use_popularity_bias=True, popularity_weight=0.1), # Leggero aiuto
-            Config(name="G3_Moderate", alpha_cf=0.3, use_popularity_bias=True, popularity_weight=0.5),
-            Config(name="G3_Strong", alpha_cf=0.3, use_popularity_bias=True, popularity_weight=1.0), # Mainstream
-            Config(name="G3_Dominant", alpha_cf=0.3, use_popularity_bias=True, popularity_weight=2.0), # La fama vince sui gusti
+            Config(name="G3_NoBias", alpha_cf=0.3, use_popularity_bias=False),
+            Config(name="G3_Subtle", alpha_cf=0.3, use_popularity_bias=True, popularity_weight=1.0),  # Era 0.1 -> Troppo basso ora
+            Config(name="G3_Moderate", alpha_cf=0.3, use_popularity_bias=True, popularity_weight=5.0), # Era 0.5
+            Config(name="G3_Strong", alpha_cf=0.3, use_popularity_bias=True, popularity_weight=10.0), # Era 1.0
+            Config(name="G3_Dominant", alpha_cf=0.3, use_popularity_bias=True, popularity_weight=20.0), # Era 2.0
         ])
 
         # ==============================================================================
@@ -85,11 +85,11 @@ def run_experiment(mode: str):
         # *Nota: Teniamo alpha_cf MOLTO BASSO (0.1) per isolare l'effetto del Content.*
         # ==============================================================================
         configs_to_run.extend([
-            Config(name="G4_AllEqual", alpha_cf=0.1, award_weight=0.5, director_weight=0.5, runtime_weight=0.5), # Base
-            Config(name="G4_DirectorOnly", alpha_cf=0.1, award_weight=0.0, director_weight=1.0, runtime_weight=0.0), # Autore conta
-            Config(name="G4_AwardOnly", alpha_cf=0.1, award_weight=1.0, director_weight=0.0, runtime_weight=0.0),   # Prestigio conta
-            Config(name="G4_RuntimeOnly", alpha_cf=0.1, award_weight=0.0, director_weight=0.0, runtime_weight=1.0), # Tempo conta
-            Config(name="G4_NoMeta", alpha_cf=0.1, award_weight=0.0, director_weight=0.0, runtime_weight=0.0),      # Nessun peso extra
+            Config(name="G4_AllEqual", alpha_cf=0.1, award_weight=5.0, director_weight=5.0, runtime_weight=5.0), # Base forte
+            Config(name="G4_DirectorOnly", alpha_cf=0.1, award_weight=0.0, director_weight=10.0, runtime_weight=0.0), # Spingiamo forte sul regista
+            Config(name="G4_AwardOnly", alpha_cf=0.1, award_weight=10.0, director_weight=0.0, runtime_weight=0.0),
+            Config(name="G4_RuntimeOnly", alpha_cf=0.1, award_weight=0.0, director_weight=0.0, runtime_weight=10.0),
+            Config(name="G4_NoMeta", alpha_cf=0.1, award_weight=0.0, director_weight=0.0, runtime_weight=0.0),
         ])
 
         # ==============================================================================
@@ -100,11 +100,11 @@ def run_experiment(mode: str):
         # PARAMETRI CHIAVE: Malus per genere proibito e dati mancanti.
         # ==============================================================================
         configs_to_run.extend([
-            Config(name="G5_Anarchy", alpha_cf=0.5, forbidden_genre_malus=0.0, missing_runtime_malus=0.0), # Nessun filtro
-            Config(name="G5_Permissive", alpha_cf=0.5, forbidden_genre_malus=0.5, missing_runtime_malus=0.0), # Soft Nudge
-            Config(name="G5_Standard", alpha_cf=0.5, forbidden_genre_malus=5.0, missing_runtime_malus=0.1),   # Default
-            Config(name="G5_Strict", alpha_cf=0.5, forbidden_genre_malus=20.0, missing_runtime_malus=1.0),    # Severo
-            Config(name="G5_Draconian", alpha_cf=0.5, forbidden_genre_malus=100.0, missing_runtime_malus=10.0), # Hard Filter
+            Config(name="G5_Anarchy", alpha_cf=0.5, forbidden_genre_malus=0.0, missing_runtime_malus=0.0),
+            Config(name="G5_Permissive", alpha_cf=0.5, forbidden_genre_malus=5.0, missing_runtime_malus=0.0), 
+            Config(name="G5_Standard", alpha_cf=0.5, forbidden_genre_malus=50.0, missing_runtime_malus=1.0),   # Default Nuovo
+            Config(name="G5_Strict", alpha_cf=0.5, forbidden_genre_malus=200.0, missing_runtime_malus=10.0),    # Molto Severo
+            Config(name="G5_Draconian", alpha_cf=0.5, forbidden_genre_malus=1000.0, missing_runtime_malus=100.0), # Muro Assoluto
         ])
 
         # ==============================================================================
@@ -114,11 +114,11 @@ def run_experiment(mode: str):
         # PARAMETRI CHIAVE: year_below_malus_per_year (Penalità cumulativa per ogni anno).
         # ==============================================================================
         configs_to_run.extend([
-            Config(name="G6_Timeless", alpha_cf=0.5, year_below_malus_per_year=0.0), # 1950 = 2024
-            Config(name="G6_Nostalgic", alpha_cf=0.5, year_below_malus_per_year=0.001), # Penalità impercettibile
-            Config(name="G6_Modernist", alpha_cf=0.5, year_below_malus_per_year=0.02),  # -2% score per anno
-            Config(name="G6_NewGen", alpha_cf=0.5, year_below_malus_per_year=0.05),     # -5% score (dopo 20 anni score è 0)
-            Config(name="G6_FreshOnly", alpha_cf=0.5, year_below_malus_per_year=0.15),   # Uccide i classici subito
+            Config(name="G6_Timeless", alpha_cf=0.5, year_below_malus_per_year=0.0),
+            Config(name="G6_Nostalgic", alpha_cf=0.5, year_below_malus_per_year=0.01), # Era 0.001
+            Config(name="G6_Modernist", alpha_cf=0.5, year_below_malus_per_year=0.2),  # Era 0.02
+            Config(name="G6_NewGen", alpha_cf=0.5, year_below_malus_per_year=0.5),     # Era 0.05
+            Config(name="G6_FreshOnly", alpha_cf=0.5, year_below_malus_per_year=1.5),  # Era 0.15
         ])
 
         # ==============================================================================
@@ -129,11 +129,11 @@ def run_experiment(mode: str):
         # *Nota: Teniamo alpha_cf ALTO (0.8) perché lo shrink agisce sulla parte CF.*
         # ==============================================================================
         configs_to_run.extend([
-            Config(name="G7_Naive", alpha_cf=0.8, shrink_term=0),   # Fiducia cieca anche con 1 voto
+            Config(name="G7_Naive", alpha_cf=0.8, shrink_term=0),
             Config(name="G7_Optimistic", alpha_cf=0.8, shrink_term=2),
-            Config(name="G7_Standard", alpha_cf=0.8, shrink_term=10), # Bilanciato
-            Config(name="G7_Skeptical", alpha_cf=0.8, shrink_term=30), # Richiede molti voti per fidarsi
-            Config(name="G7_Paranoid", alpha_cf=0.8, shrink_term=100), # Solo blockbuster consolidati
+            Config(name="G7_Standard", alpha_cf=0.8, shrink_term=10),
+            Config(name="G7_Skeptical", alpha_cf=0.8, shrink_term=30),
+            Config(name="G7_Paranoid", alpha_cf=0.8, shrink_term=100),
         ])
 
         # ==============================================================================
@@ -146,17 +146,11 @@ def run_experiment(mode: str):
         # ==============================================================================
         base_cf_svd = 0.8
         configs_to_run.extend([
-            # Bassissima risoluzione: coglie solo i macro-generi (es. Action vs Romance)
             Config(name="G8_LowRes_5", alpha_cf=base_cf_svd, svd_components=5),
-            # Bassa risoluzione: veloce e generalista
             Config(name="G8_LowRes_15", alpha_cf=base_cf_svd, svd_components=15),
-            # Media risoluzione (Spesso il punto ottimale per dataset medi)
             Config(name="G8_MidRes_30", alpha_cf=base_cf_svd, svd_components=30),
-            # Alta risoluzione: coglie sfumature sottili (es. "Cyberpunk anni '80")
             Config(name="G8_HighRes_60", alpha_cf=base_cf_svd, svd_components=60),
-            # Altissima risoluzione: Rischio overfitting alto e tempi di calcolo maggiori
             Config(name="G8_UltraRes_150", alpha_cf=base_cf_svd, svd_components=150),
-            # Estrema (solo se hai TANTI utenti/item, altrimenti è rumore puro)
             Config(name="G8_ExtremeRes_300", alpha_cf=base_cf_svd, svd_components=300),
         ])
 
@@ -170,11 +164,11 @@ def run_experiment(mode: str):
         # ==============================================================================
         base_k_cf = 0.5
         configs_to_run.extend([
-            Config(name="G9_Widget_Small", alpha_cf=base_k_cf, top_k=3),   # Solo la crème de la crème
-            Config(name="G9_Widget_Std", alpha_cf=base_k_cf, top_k=10),    # Standard
-            Config(name="G9_Page_Medium", alpha_cf=base_k_cf, top_k=25),   # Una schermata piena
-            Config(name="G9_Page_Large", alpha_cf=base_k_cf, top_k=50),    # Scroll impegnativo
-            Config(name="G9_Catalog_Deep", alpha_cf=base_k_cf, top_k=100), # Deep dive (qui la precisione crollerà)
+            Config(name="G9_Widget_Small", alpha_cf=base_k_cf, top_k=3),
+            Config(name="G9_Widget_Std", alpha_cf=base_k_cf, top_k=10),
+            Config(name="G9_Page_Medium", alpha_cf=base_k_cf, top_k=25),
+            Config(name="G9_Page_Large", alpha_cf=base_k_cf, top_k=50),
+            Config(name="G9_Catalog_Deep", alpha_cf=base_k_cf, top_k=100),
         ])
 
         # ==============================================================================
@@ -185,16 +179,11 @@ def run_experiment(mode: str):
         # Qui testiamo quanto aggressivamente PUNIRE chi esce dal range preferito.
         # ==============================================================================
         configs_to_run.extend([
-            # "Non mi importa quanto dura, basta che sia bello"
             Config(name="G10_Time_Agnostic", alpha_cf=0.3, runtime_outside_malus=0.0),
-            # "Preferirei durate simili, ma accetto eccezioni"
-            Config(name="G10_Time_Flexible", alpha_cf=0.3, runtime_outside_malus=0.2),
-            # "Se dura troppo/troppo poco, mi infastidisco" (Valore Default)
-            Config(name="G10_Time_Standard", alpha_cf=0.3, runtime_outside_malus=0.5),
-            # "Ho i minuti contati: penalizza forte chi sfora"
-            Config(name="G10_Time_Strict", alpha_cf=0.3, runtime_outside_malus=2.0),
-            # "Filtro Hard: Se la durata non è in target, il film sparisce"
-            Config(name="G10_Time_Nazi", alpha_cf=0.3, runtime_outside_malus=10.0),
+            Config(name="G10_Time_Flexible", alpha_cf=0.3, runtime_outside_malus=2.0),  # Era 0.2
+            Config(name="G10_Time_Standard", alpha_cf=0.3, runtime_outside_malus=5.0),  # Era 0.5 (Nuovo Default)
+            Config(name="G10_Time_Strict", alpha_cf=0.3, runtime_outside_malus=20.0),   # Era 2.0
+            Config(name="G10_Time_Nazi", alpha_cf=0.3, runtime_outside_malus=100.0),    # Era 10.0
         ])
 
     print(f"Total Configs to Run: {len(configs_to_run)}")
@@ -203,8 +192,8 @@ def run_experiment(mode: str):
     for i, config in enumerate(configs_to_run):
 
         # Skip all configs except the first two (DEBUG)
-        if i!=1 and i!=2:
-            continue
+        # if i!=1 and i!=2:
+        #     continue
 
         print(f"\n[{datetime.datetime.now().strftime('%H:%M:%S')}] ({i+1}/{len(configs_to_run)}) Running {config.name}...")
         

@@ -1,11 +1,4 @@
-# Obiettivi importanti
+Concetti da inserire nel PPT (non ordinati, da decidere dove inserirli)
 
-- **Metriche**: Controllare se è tutto ok 
-
-# Obiettivi medio importanti
-Valutare se ha senso farlo o no
-
-- Valutare se modificare l'arricchimento del dataset.
-
-# Fix e Aggiunte
-Qui ci sono dei piccoli miglioramenti che si possono fare ma sono di minor importanza.
+1 - Divisione 80/20 del dataset (Capitolo DATASET/COLLABORATIVE)
+2 - Y true (TEST)
