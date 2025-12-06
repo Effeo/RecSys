@@ -1,0 +1,200 @@
+Buongiorno. Ho esaminato la documentazione del vostro progetto "Intelligent Web". Vedo che avete implementato un sistema ibrido che integra Knowledge-Based filtering con Collaborative Filtering, arricchito da dati estratti via SPARQL.
+
+Di seguito, vi pongo una serie di domande d'esame mirate a comprendere la logica profonda delle vostre scelte implementative e la validità della vostra metodologia sperimentale. Troverete anche le risposte attese basate sulla vostra codebase.
+
+***
+
+### Domanda 1: Costruzione del Profilo Utente e Preferenze Implicite
+**Professore:** "Nel vostro modulo di *profiling*, come avete tradotto lo storico dei voti (ratings) in preferenze semantiche utilizzabili dal sistema Knowledge-Based? In particolare, come avete gestito la distinzione tra generi graditi e 'generi vietati' e come avete integrato i dati esterni sui registi?"
+
+**Risposta del Candidato:**
+"Per costruire il profilo utente abbiamo implementato una logica euristica nel modulo `profiling.py`.
+1.  **Soglie di gradimento:** Abbiamo considerato come **items piaciuti** quelli con rating $\ge 4.0$ e come **items sgraditi** quelli con rating $\le 2.0$.
+2.  **Generi:** I generi "desiderati" sono i top 3 generi derivati dalla somma delle occorrenze nei film piaciuti. Per i "generi vietati", analizziamo i film sgraditi ed escludiamo i generi che compaiono anche tra i preferiti (per evitare conflitti).
+3.  **Registi e Runtime:** Sfruttando i dati arricchiti, calcoliamo la media del `runtime` dei film piaciuti e identifichiamo i registi ricorrenti (che appaiono più di una volta nello storico positivo). Questi dati vengono poi usati come vincoli o boost nel calcolo dello score."
+
+### Domanda 2: Strategia di Arricchimento Dati (SPARQL)
+**Professore:** "Il progetto richiedeva l'uso di query SPARQL su DBpedia. Come avete strutturato la pipeline di arricchimento e quale strategia di fallback avete adottato nel caso in cui DBpedia non fornisse risultati per un film del MovieLens dataset?"
+
+**Risposta del Candidato:**
+"Abbiamo creato uno script dedicato, `enrich_movies.py`, che itera sui titoli del dataset.
+1.  **Query Primaria:** Interroghiamo **DBpedia** per estrarre il regista (`dbo:director`), la durata (`dbo:runtime`) e i premi vinti (`dbo:award`).
+2.  **Strategia Fallback:** Poiché DBpedia può essere incompleta, in caso di dati mancanti (specialmente se mancano sia regista che durata), eseguiamo una query di fallback su **Wikidata** (`service wikibase:label`), filtrando per anno di uscita per risolvere ambiguità sui titoli.
+3.  **Normalizzazione:** I dati vengono puliti (es. rimozione dell'anno dal titolo) e salvati in un CSV arricchito (`movies_enriched.csv`) che funge da Knowledge Base per il recommender."
+
+### Domanda 3: Logica Ibrida e Gestione del Punteggio
+**Professore:** "Nel file `evaluator.py` vedo una classe `HybridEvaluator`. Spiegatemi matematicamente come viene composto il punteggio finale (`hybrid_scores`) per raccomandare un film. Come bilanciate la componente collaborativa (CF) con quella basata sui vincoli (Knowledge-Based)?"
+
+**Risposta del Candidato:**
+"Il punteggio finale è una combinazione lineare di due componenti, controllata dal parametro `config.alpha_cf`:
+$$Score_{hybrid} = Score_{constraint} + (\alpha \cdot Score_{CF})$$
+1.  **Score Constraint:** È un punteggio additivo calcolato in `_calculate_constraint_score`. Partendo da 0, aggiungiamo punti se il film corrisponde ai generi preferiti, se il regista è tra i favoriti o se ha vinto premi. Sottraiamo punti (malus) se il film appartiene a generi vietati o se la durata si discosta troppo dalla preferenza dell'utente (usando una funzione di tolleranza).
+2.  **Score CF:** Utilizziamo una **TruncatedSVD** sulla matrice Utente-Item normalizzata per calcolare una matrice di similarità tra item (`item_corr_matrix`). Se l'utente ha un film 'seed' (il più votato), aggiungiamo al punteggio la similarità tra il seed e i candidati.
+I due score vengono sommati per ottenere la graduatoria finale."
+
+### Domanda 4: Exploration vs Exploitation (MAB)
+**Professore:** "La traccia richiedeva l'uso di tecniche MAB (Multi-Armed Bandit) per il dilemma exploration-exploitation. Non vedo implementazioni classiche come UCB1 o Thompson Sampling. Quale approccio avete scelto per introdurre 'exploration' nel vostro sistema?"
+
+**Risposta del Candidato:**
+"Abbiamo optato per una strategia di **Softmax Exploration** (nota anche come Boltzmann Exploration), configurabile tramite il parametro `temperature`.
+Invece di selezionare in modo deterministico i Top-K film con lo score più alto (Greedy/Exploitation puro), trasformiamo gli score ibridi in probabilità usando la funzione Softmax:
+$$P(i) = \frac{e^{score_i / T}}{\sum e^{score_j / T}}$$
+Successivamente, campioniamo i film da raccomandare basandoci su queste probabilità.
+Nei nostri esperimenti (Gruppo 2 nel `main.py`), abbiamo testato diverse temperature: temperature basse favoriscono l'exploitation (scelte sicure), mentre temperature alte aumentano l'entropia e quindi l'exploration verso item con score leggermente inferiori ma validi."
+
+### Domanda 5: Metodologia di Verifica Sperimentale (y_true)
+**Professore:** "Passiamo alla valutazione. Nel calcolo delle metriche come MSE (Mean Squared Error), come avete definito la *Ground Truth* (`y_true`) per un set di raccomandazioni, dato che nel test set avete solo i rating positivi dell'utente?"
+
+**Risposta del Candidato:**
+"Questa è stata una scelta critica definita in `_compute_metrics`. Per valutare un set di raccomandazioni rispetto al test set dell'utente:
+1.  Identifichiamo i `positives_ids` nel test set (rating $\ge 3.0$).
+2.  Costruiamo il vettore `y_true` per il pool di valutazione (unione di raccomandati e positivi reali).
+3.  Invece di usare i rating grezzi (1-5), abbiamo definito la probabilità target come:
+    * **1.0 / N_positivi** se il film è effettivamente nel test set positivo dell'utente.
+    * **0.0** altrimenti.
+Confrontiamo questo vettore con le probabilità predette dal nostro modello (`y_pred`) per calcolare MSE e MAE. Questo ci dice quanto la distribuzione di probabilità del nostro modello si avvicina alla distribuzione ideale in cui l'utente guarda solo i film che gli piacciono."
+
+### Domanda 6: Analisi dei Risultati (Grid Search)
+**Professore:** "Ho notato nel `main.py` una vasta suite di test ('Battery Experiments'). Quale configurazione, tra i gruppi testati (G1-G10), ha fornito il miglior compromesso tra precisione e diversità?"
+
+**Risposta del Candidato:**
+"Abbiamo strutturato i test per isolare diverse variabili.
+Dai gruppi sperimentali emerge che:
+* **G1 (Hybrid Balance):** Una configurazione bilanciata (`G1_Balanced`, alpha=0.5) o leggermente sbilanciata verso il CF tende a performare meglio di approcci puri, mitigando il problema del cold start dei soli metadati.
+* **G5 (Strictness):** L'applicazione di malus troppo severi (`G5_Strict`) per i generi vietati o durate errate tende a ridurre drasticamente il numero di candidati validi, peggiorando la *Recall* senza guadagni significativi in precisione. Una penalità 'Standard' si è rivelata più robusta.
+* **G2 (Sampling):** L'uso del campionamento probabilistico con temperature moderate (`G2_Balanced`) ha aumentato la *Novelty* e la *Diversity* delle raccomandazioni rispetto all'approccio deterministico, pur mantenendo un MSE accettabile."
+
+
+Certamente. Questa è una delle parti più sofisticate e "filosofiche" della nostra implementazione, che merita un approfondimento tecnico.
+
+La scelta di come definire `y_true` nel file `evaluator.py` deriva dalla necessità di valutare il recommender non come un semplice classificatore binario (Mi piace / Non mi piace), ma come un **generatore di probabilità**.
+
+Ecco i dettagli tecnici della nostra implementazione:
+
+### 1\. Il Problema della Disparità di Scala
+
+In un sistema di raccomandazione classico, spesso si definisce la *Ground Truth* in modo binario:
+
+  * $y=1$ se il film è nel test set (ed è piaciuto).
+  * $y=0$ altrimenti.
+
+Tuttavia, il nostro modello utilizza una **Softmax Exploration**. Questo significa che l'output del modello (`y_pred`) non è uno score assoluto (es. 4.5 stelle), ma una **probabilità normalizzata** che somma a 1.0 su tutto il catalogo.
+
+  * *Esempio:* Se il modello è molto incerto su 10 film, potrebbe assegnare a ciascuno una probabilità del $0.1$ (10%).
+
+Se confrontassimo direttamente questa probabilità ($0.1$) con un target binario ($1.0$), l'errore (MSE) sarebbe strutturalmente altissimo e poco informativo, perché stiamo confrontando una "fetta di torta" (probabilità) con una "torta intera" (certezza assoluta).
+
+### 2\. La Soluzione: Distribuzione di Probabilità Target
+
+Per rendere confrontabili `y_pred` e `y_true`, abbiamo deciso di trattare anche la verità come una distribuzione di probabilità.
+
+Nel codice `evaluator.py`, calcoliamo `y_true` così:
+
+```python
+y_true = np.array([1.0/len(positives_ids) if mid in positives_ids else 0.0 for mid in eval_pool])
+```
+
+La logica è la seguente:
+
+1.  **Identificazione dei Positivi:** Prendiamo tutti i film nel test set dell'utente che hanno ricevuto un voto $\ge 3.0$ (`positives_ids`). Supponiamo siano $N$ film.
+2.  **Equipartizione della Massa:** Immaginiamo che l'attenzione dell'utente sia una risorsa finita pari al 100% (1.0). Se all'utente piacciono 5 film nel test set, assumiamo che la "probabilità ideale" che guardi uno di quei film sia $1/5 = 0.20$ (20%).
+3.  **Costruzione del Vettore:**
+      * Ai film **piaciuti** viene assegnato valore $1/N$.
+      * Ai film **non piaciuti** (o non presenti nel test set) viene assegnato $0.0$.
+
+### 3\. Esempio Pratico
+
+Immaginiamo che nel test set all'utente piacciano solo 2 film: **"Titanic"** e **"Avatar"**.
+
+  * **Approccio Classico:** `y_true` sarebbe `[1, 1]`.
+  * **Nostro Approccio:** `y_true` diventa `[0.5, 0.5]`.
+
+Se il nostro modello raccomanda **"Titanic"** con una confidenza (probabilità) del **40% (0.4)**:
+
+  * L'errore calcolato sarà la differenza tra **0.5 (Target Ideale)** e **0.4 (Predizione)** = $0.1$.
+  * Questo errore è molto basso, indicando che il modello ha "capito" che Titanic è una scelta molto probabile, quasi quanto la realtà ideale.
+
+### 4\. Vantaggi per la metrica MSE/MAE
+
+Questa normalizzazione rende il **Mean Squared Error (MSE)** e il **Mean Absolute Error (MAE)** molto più significativi per valutare la *calibrazione* del modello:
+
+  * Un MSE basso non significa solo "ha indovinato il film", ma significa "ha assegnato la giusta quantità di importanza a questo film rispetto agli altri film piaciuti".
+  * Penalizza l'eccessiva sicurezza (overconfidence) su film sbagliati e premia la distribuzione corretta dell'incertezza sui film giusti.
+
+
+**Professore:** "Ottima domanda, che dimostra che state ragionando sulla statistica sottostante e non solo sul codice.
+
+La risposta breve è: **Sì, è formalmente corretto e coerente**, ma implica un'assunzione forte chiamata *Maximum Entropy*.
+
+Ecco l'analisi approfondita che mi aspetterei all'esame:"
+
+### 1. Perché è corretto: Confronto tra Distribuzioni
+Matematicamente, state confrontando due oggetti della stessa natura:
+* **`y_pred` (Softmax):** È una distribuzione di probabilità ($\sum p_i = 1$). Rappresenta la credenza del modello su dove l'utente focalizzerà la sua attenzione.
+* **`y_true` (Uniforme su Positivi):** Anche questa è una distribuzione di probabilità normalizzata ($\sum y_i = 1$).
+
+Non state confrontando "Mele con Pere" (es. probabilità con classi binarie pure), ma state misurando la distanza tra la **distribuzione predetta** e una **distribuzione target ideale**. State essenzialmente chiedendo al modello: *"Distribuisci la tua massa di probabilità (100%) esattamente come si è distribuita l'attenzione dell'utente nel test set"*.
+
+### 2. Il Principio di Massima Entropia
+La scelta di usare una distribuzione **Uniforme** per `y_true` (invece, ad esempio, di pesare di più i film con 5 stelle rispetto a quelli con 3) è giustificata dal principio di **Maximum Entropy**.
+* *Dato:* Sappiamo che l'utente ha gradito i film A, B e C.
+* *Ignoto:* Non sappiamo se ha preferito A rispetto a B in quel momento specifico.
+* *Conclusione:* In assenza di informazioni sull'ordine di preferenza relativo nel test set, l'assunzione più onesta (quella che introduce meno *bias*) è assumere che siano tutti equiprobabili ($1/3$ ciascuno).
+
+### 3. La Metrica: MSE vs Cross-Entropy (Critica Accademica)
+Qui è dove potrei farvi un'osservazione critica.
+Avete usato l'**MSE** (`mean_squared_error`) per confrontare le due distribuzioni.
+
+* **MSE (Brier Score):** È accettabile. Nel contesto probabilistico, l'MSE su vettori di probabilità è noto come **Brier Score Multiclasse**. Misura quanto siete "lontani" in media. È robusto e facile da interpretare.
+* **Cross-Entropy (KL Divergence):** In ambito Deep Learning/Probabilistico, la metrica "naturale" da accoppiare alla Softmax è la **Categorical Cross-Entropy** (o la Divergenza di Kullback-Leibler). Questa metrica penalizza molto più severamente il modello se assegna probabilità $0$ (o molto bassa) a un evento che in `y_true` è positivo.
+
+**In sintesi per l'esame:**
+"Professore, usare l'MSE è corretto perché stiamo calcolando il Brier Score della nostra predizione probabilistica. Sebbene la Cross-Entropy sia teoricamente più legata alla verosimiglianza della Softmax, l'MSE ci fornisce una misura più intuitiva dell'errore medio di allocazione della probabilità per ogni item."
+
+### 4. Il limite della "Verità" (Missing Data)
+L'unico vero difetto concettuale (non matematico) è insito nei dati, non nella formula:
+Se `y_true` è $0$ per un film non visto, e il vostro modello prevede $0.2$ (perché è un film molto affine), l'MSE penalizzerà il modello considerandolo un errore. Ma nella realtà, quel film potrebbe piacere all'utente (è un "falso negativo" nel test set, ma una buona raccomandazione).
+Questo però è un problema irrisolvibile nell'offline evaluation senza dati completi, quindi la vostra scelta rimane la *best practice* in questo contesto.
+
+
+Ecco un'analisi approfondita dei risultati sperimentali sotto forma di domande d'esame e relative risposte, basate sui dati del CSV fornito.
+
+***
+
+### Domanda 1: Il Trade-off della Popolarità (Gruppo 3)
+**Professore:** "Osservando il **Gruppo 3 (Popularity Bias)**, confrontate le prestazioni di `G3_NoBias` (peso 0.0) con `G3_Dominant` (peso 2.0). C'è un aumento drastico della Precisione, ma qual è il 'prezzo' nascosto di questo miglioramento in termini di *Novelty*? Perché accade questo?"
+
+**Risposta del Candidato:**
+"Dai dati emerge un chiaro trade-off:
+* **G3_NoBias:** Ha una Precisione di circa **0.031** e una Novelty alta di **12.35**.
+* **G3_Dominant:** La Precisione raddoppia a **0.067** e le Hits salgono a **0.67**, ma la Novelty crolla drasticamente a **9.57**.
+
+Questo accade perché aumentando il peso della popolarità, il sistema spinge in alto film *blockbuster* che la maggior parte degli utenti ha già visto e votato positivamente (aumentando precisione e hits). Tuttavia, il sistema smette di fare vera 'scoperta', raccomandando oggetti banali e riducendo la sorpresa (Novelty) per l'utente."
+
+### Domanda 2: Determinismo vs. Caos (Gruppo 2)
+**Professore:** "Analizziamo l'impatto del campionamento probabilistico nel **Gruppo 2**. Confrontate la configurazione `G2_Deterministic` con `G2_Chaos`. L'introduzione di una componente stocastica (temperatura alta e sampling pool ampio) ha migliorato la capacità del sistema di indovinare i gusti dell'utente?"
+
+**Risposta del Candidato:**
+"No, al contrario, ha degradato significativamente l'accuratezza.
+* **G2_Deterministic** (Argmax puro) ottiene una Precisione di **0.031**.
+* **G2_Chaos** (Sampling su 200 item, Temp 3.0) crolla a una Precisione di **0.012**.
+
+Sebbene `G2_Chaos` aumenti leggermente la **Diversity (0.59 vs 0.57)** e la **Novelty (13.41 vs 12.33)**, il crollo della precisione indica che il sistema sta 'pescando' troppo spesso film irrilevanti dalla coda lunga, rendendo le raccomandazioni troppo casuali per essere utili."
+
+### Domanda 3: Scalabilità della Lista (Gruppo 9)
+**Professore:** "Guardando il **Gruppo 9**, come varia la qualità delle raccomandazioni passando da una lista corta ('Widget' di 3 item) a un catalogo profondo (100 item)? La precisione scala linearmente?"
+
+**Risposta del Candidato:**
+"La precisione non scala linearmente, ma degrada all'aumentare del `top_k`.
+* **G9_Widget_Small (k=3):** Precisione **0.032**.
+* **G9_Catalog_Deep (k=100):** Precisione **0.016**.
+
+Questo dimezzamento suggerisce che il recommender è bravo a identificare i primissimi item rilevanti, ma fatica a riempire una lista lunga con contenuti di alta qualità per l'utente. Tuttavia, notiamo che la **Recall** aumenta ovviamente con il k (da 0.006 a 0.10), poiché mostrare più oggetti aumenta la probabilità di beccarne almeno uno giusto."
+
+### Domanda 4: Hybrid vs Pure Approaches (Gruppo 1)
+**Professore:** "Nel **Gruppo 1**, quale configurazione ha mostrato il miglior bilanciamento o la miglior precisione assoluta? È meglio un approccio puramente collaborativo o puramente basato sul contenuto in questo dataset?"
+
+**Risposta del Candidato:**
+"Sorprendentemente, la configurazione **G1_ContentDominant** ($\alpha=0.2$) ha ottenuto la Precisione più alta del gruppo (**0.0318**), superando leggermente sia il `PureCF` (0.0307) che il `PureContent` (0.0256).
+Questo indica che in questo specifico contesto (probabilmente a causa della sparsità dei dati o della ricchezza dei metadati arricchiti via SPARQL), affidarsi principalmente al contenuto ma 'correggendo' il tiro con una leggera componente collaborativa produce i risultati più accurati rispetto agli estremi puri."
+
