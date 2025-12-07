@@ -295,7 +295,7 @@ class HybridEvaluator:
             cf_scores = cf_scores.add(sim_series, fill_value=0)
 
         # 5. Ibridazione
-        hybrid_scores = constraint_scores + (self.config.alpha_cf * cf_scores)
+        hybrid_scores = (1 - self.config.alpha_cf) * constraint_scores + (self.config.alpha_cf * cf_scores)
 
         # Maschera film già visti
         already_seen = train_subset["movie_id"].unique()
