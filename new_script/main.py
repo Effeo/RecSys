@@ -1,264 +1,146 @@
 import argparse
-import json
-import datetime
+import pandas as pd
+import copy
 from pathlib import Path
 from config import Config
-from evaluator import HybridEvaluator
-import pandas as pd
+from evaluator import HybridRatingPredictor
 
-def run_experiment(mode: str):
+def run_full_experiment():
     data_dir = Path("../data")
-    configs_to_run = []
-    experiment_results = []
-    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    json_filename = f"results_batteries_{ts}.json"
-    csv_filename = f"results_batteries_{ts}.csv"
-
-
-    if mode == "test":
-        print(">>> TEST MODE (Smoke Test) <<<")
-        # Test veloce su pochi utenti per verificare che non ci siano bug
-        configs_to_run.append(Config(name="QuickTest_Smoke", verbose_users=1, top_k=5))
-        user_limit = 5
-    else:
-        print(">>> FULL GRID SEARCH: EXTENDED BATTERY <<<")
-        user_limit = None 
+    ratings_path = data_dir / "ratings.csv"
+    movies_path = data_dir / "movies_enriched.csv"
+    
+    # ==============================================================================
+    # FASE 1: RATING PREDICTION TOURNAMENT (MSE/MAE)
+    # Obiettivo: Trovare il modello che sbaglia di meno nel prevedere il voto esatto.
+    # ==============================================================================
+    
+    print(f"{'='*80}")
+    print(f"PHASE 1: ACCURACY TOURNAMENT (Finding the Best Predictor)")
+    print(f"{'='*80}\n")
+    
+    # Definiamo i candidati
+    candidates = [
+        # 1. Baseline: Solo Bias (Media globale + bias utente + bias item)
+        Config(name="01_Baseline", alpha_cf=0.0, constraint_scaler=0.0, shrink_term=10),
         
-        # ==============================================================================
-        # GRUPPO 1: HYBRID BALANCE (Chi comanda? Storia o Contenuto?)
-        # ------------------------------------------------------------------------------
-        # OBIETTIVO: Trovare il punto in cui massimizziamo la precisione storica (CF) 
-        # senza perdere la capacità di raccomandare item meno votati (Content).
-        # PARAMETRI CHIAVE: 
-        # - alpha_cf: 1.0 = Solo voti utenti (CF), 0.0 = Solo metadati film (CB).
-        # - svd_components: Risoluzione della mappa utenti (Bassa=Macro gusti, Alta=Dettagli).
-        # ==============================================================================
-        configs_to_run.extend([
-            Config(name="G1_PureContent", alpha_cf=0.0),            # Usa i nuovi pesi ALTI di default
-            Config(name="G1_ContentDominant", alpha_cf=0.2),
-            Config(name="G1_Balanced", alpha_cf=0.5),
-            Config(name="G1_CFDominant", alpha_cf=0.8),
-            Config(name="G1_PureCF", alpha_cf=1.0),                 # Ignora i pesi content
-            Config(name="G1_ComplexCF", alpha_cf=0.8, svd_components=100),
-        ])
-
-        # ==============================================================================
-        # GRUPPO 2: SAMPLING & DISCOVERY (Noia vs Rischio)
-        # ------------------------------------------------------------------------------
-        # OBIETTIVO: Capire se l'utente preferisce una lista fissa e perfetta (Deterministica)
-        # o una lista che cambia e sorprende (Probabilistica).
-        # PARAMETRI CHIAVE:
-        # - pool: Quanto è grande il secchio da cui pescare? (Piccolo=Sicuro, Grande=Rischioso)
-        # - temperature: Quanto appiattire le differenze di score? (Alta=Caos/Varietà).
-        # *Nota: Teniamo alpha_cf fisso a 0.4 per avere una base stabile.*
-        # ==============================================================================
-        base_s = 0.4
-        configs_to_run.extend([
-            Config(name="G2_Deterministic", alpha_cf=base_s, use_probabilistic_sampling=False),
-            Config(name="G2_Conservative", alpha_cf=base_s, use_probabilistic_sampling=True, sampling_top_k_pool=20, temperature=0.5),
-            Config(name="G2_Balanced", alpha_cf=base_s, use_probabilistic_sampling=True, sampling_top_k_pool=50, temperature=1.0),
-            Config(name="G2_Adventurous", alpha_cf=base_s, use_probabilistic_sampling=True, sampling_top_k_pool=100, temperature=1.5),
-            Config(name="G2_Chaos", alpha_cf=base_s, use_probabilistic_sampling=True, sampling_top_k_pool=200, temperature=3.0),
-            Config(name="G2_DeepCatalog", alpha_cf=base_s, use_probabilistic_sampling=True, sampling_top_k_pool=None, temperature=0.2),
-        ])
-
-        # ==============================================================================
-        # GRUPPO 3: POPULARITY BIAS (Mainstream vs Nicchia)
-        # ------------------------------------------------------------------------------
-        # OBIETTIVO: Vedere se "aiutare" i film famosi aumenta il CTR o uccide la personalizzazione.
-        # PARAMETRI CHIAVE:
-        # - popularity_weight: Bonus aggiunto agli item globalmente famosi.
-        # ==============================================================================
-        configs_to_run.extend([
-            Config(name="G3_NoBias", alpha_cf=0.3, use_popularity_bias=False),
-            Config(name="G3_Subtle", alpha_cf=0.3, use_popularity_bias=True, popularity_weight=1.0),  # Era 0.1 -> Troppo basso ora
-            Config(name="G3_Moderate", alpha_cf=0.3, use_popularity_bias=True, popularity_weight=5.0), # Era 0.5
-            Config(name="G3_Strong", alpha_cf=0.3, use_popularity_bias=True, popularity_weight=10.0), # Era 1.0
-            Config(name="G3_Dominant", alpha_cf=0.3, use_popularity_bias=True, popularity_weight=20.0), # Era 2.0
-        ])
-
-        # ==============================================================================
-        # GRUPPO 4: CONTENT ANATOMY (Feature Ablation Study)
-        # ------------------------------------------------------------------------------
-        # OBIETTIVO: Capire quali metadati contano davvero per gli utenti (Regista? Premi? Durata?).
-        # PARAMETRI CHIAVE: Pesi delle feature (award, director, runtime).
-        # *Nota: Teniamo alpha_cf MOLTO BASSO (0.1) per isolare l'effetto del Content.*
-        # ==============================================================================
-        configs_to_run.extend([
-            Config(name="G4_AllEqual", alpha_cf=0.1, award_weight=5.0, director_weight=5.0, runtime_weight=5.0), # Base forte
-            Config(name="G4_DirectorOnly", alpha_cf=0.1, award_weight=0.0, director_weight=10.0, runtime_weight=0.0), # Spingiamo forte sul regista
-            Config(name="G4_AwardOnly", alpha_cf=0.1, award_weight=10.0, director_weight=0.0, runtime_weight=0.0),
-            Config(name="G4_RuntimeOnly", alpha_cf=0.1, award_weight=0.0, director_weight=0.0, runtime_weight=10.0),
-            Config(name="G4_NoMeta", alpha_cf=0.1, award_weight=0.0, director_weight=0.0, runtime_weight=0.0),
-        ])
-
-        # ==============================================================================
-        # GRUPPO 5: STRICTNESS (I Guardiani della Soglia)
-        # ------------------------------------------------------------------------------
-        # OBIETTIVO: Capire se essere severi sui filtri (Malus) migliora la qualità percepita
-        # o causa il problema "Zero Results".
-        # PARAMETRI CHIAVE: Malus per genere proibito e dati mancanti.
-        # ==============================================================================
-        configs_to_run.extend([
-            Config(name="G5_Anarchy", alpha_cf=0.5, forbidden_genre_malus=0.0, missing_runtime_malus=0.0),
-            Config(name="G5_Permissive", alpha_cf=0.5, forbidden_genre_malus=5.0, missing_runtime_malus=0.0), 
-            Config(name="G5_Standard", alpha_cf=0.5, forbidden_genre_malus=50.0, missing_runtime_malus=1.0),   # Default Nuovo
-            Config(name="G5_Strict", alpha_cf=0.5, forbidden_genre_malus=200.0, missing_runtime_malus=10.0),    # Molto Severo
-            Config(name="G5_Draconian", alpha_cf=0.5, forbidden_genre_malus=1000.0, missing_runtime_malus=100.0), # Muro Assoluto
-        ])
-
-        # ==============================================================================
-        # GRUPPO 6: RECENCY BIAS (Il Fattore Tempo)
-        # ------------------------------------------------------------------------------
-        # OBIETTIVO: Capire il tasso di decadimento dell'interesse. I vecchi film valgono?
-        # PARAMETRI CHIAVE: year_below_malus_per_year (Penalità cumulativa per ogni anno).
-        # ==============================================================================
-        configs_to_run.extend([
-            Config(name="G6_Timeless", alpha_cf=0.5, year_below_malus_per_year=0.0),
-            Config(name="G6_Nostalgic", alpha_cf=0.5, year_below_malus_per_year=0.01), # Era 0.001
-            Config(name="G6_Modernist", alpha_cf=0.5, year_below_malus_per_year=0.2),  # Era 0.02
-            Config(name="G6_NewGen", alpha_cf=0.5, year_below_malus_per_year=0.5),     # Era 0.05
-            Config(name="G6_FreshOnly", alpha_cf=0.5, year_below_malus_per_year=1.5),  # Era 0.15
-        ])
-
-        # ==============================================================================
-        # GRUPPO 7: DATA TRUST (Sparsity & Shrinkage)
-        # ------------------------------------------------------------------------------
-        # OBIETTIVO: Gestire i falsi positivi (film con 1 voto da 5 stelle).
-        # PARAMETRI CHIAVE: shrink_term (freno per item con pochi voti).
-        # *Nota: Teniamo alpha_cf ALTO (0.8) perché lo shrink agisce sulla parte CF.*
-        # ==============================================================================
-        configs_to_run.extend([
-            Config(name="G7_Naive", alpha_cf=0.8, shrink_term=0),
-            Config(name="G7_Optimistic", alpha_cf=0.8, shrink_term=2),
-            Config(name="G7_Standard", alpha_cf=0.8, shrink_term=10),
-            Config(name="G7_Skeptical", alpha_cf=0.8, shrink_term=30),
-            Config(name="G7_Paranoid", alpha_cf=0.8, shrink_term=100),
-        ])
-
-        # ==============================================================================
-        # GRUPPO 8: MATRIX RESOLUTION (SVD Sensitivity)
-        # ------------------------------------------------------------------------------
-        # OBIETTIVO: Capire la "risoluzione" ottimale della mappa dei gusti.
-        # - Pochi componenti (Underfitting): Il sistema generalizza troppo (es. "Ti piacciono i film").
-        # - Troppi componenti (Overfitting): Il sistema impara il rumore (es. "Ti piace questo film solo perché hai cliccato per sbaglio").
-        # *Nota: Fissiamo alpha_cf alto (0.8) per assicurarci che l'SVD sia il motore principale.*
-        # ==============================================================================
-        base_cf_svd = 0.8
-        configs_to_run.extend([
-            Config(name="G8_LowRes_5", alpha_cf=base_cf_svd, svd_components=5),
-            Config(name="G8_LowRes_15", alpha_cf=base_cf_svd, svd_components=15),
-            Config(name="G8_MidRes_30", alpha_cf=base_cf_svd, svd_components=30),
-            Config(name="G8_HighRes_60", alpha_cf=base_cf_svd, svd_components=60),
-            Config(name="G8_UltraRes_150", alpha_cf=base_cf_svd, svd_components=150),
-            Config(name="G8_ExtremeRes_300", alpha_cf=base_cf_svd, svd_components=300),
-        ])
-
-        # ==============================================================================
-        # GRUPPO 9: OUTPUT SCALE SENSITIVITY (Widget vs Catalog)
-        # ------------------------------------------------------------------------------
-        # OBIETTIVO: Capire come degrada la qualità all'aumentare dei risultati richiesti.
-        # - top_k basso (5-10): Simuliamo un carosello "Top Picks" in Home Page.
-        # - top_k alto (50-100): Simuliamo una pagina "Vedi tutti i consigliati".
-        # *Domanda:* La precisione crolla verticalmente dopo il 10° item? Se sì, non fare pagine lunghe.
-        # ==============================================================================
-        base_k_cf = 0.5
-        configs_to_run.extend([
-            Config(name="G9_Widget_Small", alpha_cf=base_k_cf, top_k=3),
-            Config(name="G9_Widget_Std", alpha_cf=base_k_cf, top_k=10),
-            Config(name="G9_Page_Medium", alpha_cf=base_k_cf, top_k=25),
-            Config(name="G9_Page_Large", alpha_cf=base_k_cf, top_k=50),
-            Config(name="G9_Catalog_Deep", alpha_cf=base_k_cf, top_k=100),
-        ])
-
-        # ==============================================================================
-        # GRUPPO 10: DURATION TOLERANCE (Ho tempo o vado di fretta?)
-        # ------------------------------------------------------------------------------
-        # OBIETTIVO: Testare specificamente il `runtime_outside_malus`.
-        # Differenza col Gruppo 4: Lì testavamo se la durata è una feature utile. 
-        # Qui testiamo quanto aggressivamente PUNIRE chi esce dal range preferito.
-        # ==============================================================================
-        configs_to_run.extend([
-            Config(name="G10_Time_Agnostic", alpha_cf=0.3, runtime_outside_malus=0.0),
-            Config(name="G10_Time_Flexible", alpha_cf=0.3, runtime_outside_malus=2.0),  # Era 0.2
-            Config(name="G10_Time_Standard", alpha_cf=0.3, runtime_outside_malus=5.0),  # Era 0.5 (Nuovo Default)
-            Config(name="G10_Time_Strict", alpha_cf=0.3, runtime_outside_malus=20.0),   # Era 2.0
-            Config(name="G10_Time_Nazi", alpha_cf=0.3, runtime_outside_malus=100.0),    # Era 10.0
-        ])
-
-    print(f"Total Configs to Run: {len(configs_to_run)}")
-
-    # --- EXECUTION LOOP ---
-    for i, config in enumerate(configs_to_run):
-
-        # Skip all configs except the first two (DEBUG)
-        # if i!=1 and i!=2:
-        #     continue
-
-        print(f"\n[{datetime.datetime.now().strftime('%H:%M:%S')}] ({i+1}/{len(configs_to_run)}) Running {config.name}...")
+        # 2. Pure SVD: Solo Collaborative Filtering
+        Config(name="02_Pure_SVD", alpha_cf=1.0, constraint_scaler=0.0, svd_components=20),
         
+        # 3. Pure Content: Solo Constraints (Vincoli su Regista, Genere, etc.)
+        # Nota: constraint_scaler è alto qui per dare peso ai vincoli
+        Config(name="03_Pure_Content", alpha_cf=0.0, constraint_scaler=0.2),
+        
+        # 4. Hybrid Balanced: 50% SVD / 50% Content
+        Config(name="04_Hybrid_Balanced", alpha_cf=0.5, constraint_scaler=0.1, svd_components=20),
+        
+        # 5. Hybrid CF Dominant: SVD forte + piccola correzione Content
+        Config(name="05_Hybrid_CF_Dom", alpha_cf=0.8, constraint_scaler=0.05, svd_components=30),
+    ]
+
+    phase1_results = []
+    best_mse = float('inf')
+    best_config = None
+
+    for conf in candidates:
+        print(f">>> Testing Candidate: {conf.name}")
         try:
-            evaluator = HybridEvaluator(config, ratings_path=data_dir / "ratings.csv", movies_path=data_dir / "movies_enriched.csv")
-            results_df = evaluator.evaluate(limit_users=user_limit)
+            predictor = HybridRatingPredictor(conf, ratings_path, movies_path)
             
-            if not results_df.empty:
-                metrics = {
-                    "mse": float(results_df['mse'].mean()), 
-                    "mae": float(results_df['mae'].mean()),
-                    "precision": float(results_df['precision'].mean()), 
-                    "recall": float(results_df['recall'].mean()),
-                    "novelty": float(results_df['novelty'].mean()), 
-                    "diversity": float(results_df['diversity'].mean()),
-                    "hits": float(results_df['hits'].mean())
-                }
-                
-                print(f"   -> MSE: {metrics['mse']:.4f} | MAE: {metrics['mae']:.4f} | Prec@K: {metrics['precision']:.4f} | Recall: {metrics['recall']:.4f} | Nov: {metrics['novelty']:.2f} | Div: {metrics['diversity']:.2f} | Hits: {metrics['hits']:.2f}")
-                
-                # Aggiungiamo alla lista in memoria
-                experiment_results.append({
-                    "config_name": config.name,
-                    "metrics": metrics,
-                    "params": {k:v for k,v in config.__dict__.items() if not k.startswith('_')}
-                })
-
-                # --- SALVATAGGIO INCREMENTALE (JSON + CSV) ---
-                if mode != "test":
-                    try:
-                        # 1. Salva JSON (Backup raw)
-                        with open(json_filename, "w") as f: 
-                            json.dump(experiment_results, f, indent=4)
-                        
-                        # 2. Crea e Salva CSV (Formattato e Pulito)
-                        # json_normalize "appiattisce" metrics e params in colonne
-                        df_results = pd.json_normalize(experiment_results)
-                        
-                        # Pulizia Nomi Colonne (Opzionale ma consigliato per leggibilità)
-                        df_results.columns = df_results.columns.str.replace("metrics.", "", regex=False)
-                        df_results.columns = df_results.columns.str.replace("params.", "p_", regex=False)
-                        
-                        # Riordino Colonne: Mettiamo Name e Metriche all'inizio
-                        cols = list(df_results.columns)
-                        priority_cols = ['config_name', 'mse', 'precision', 'recall', 'novelty', 'diversity']
-                        # Mettiamo prima le priority (se esistono), poi il resto
-                        final_order = [c for c in priority_cols if c in cols] + [c for c in cols if c not in priority_cols]
-                        df_results = df_results[final_order]
-
-                        # Scrittura su disco
-                        df_results.to_csv(csv_filename, index=False)
-                        
-                    except Exception as save_err:
-                        print(f"   -> WARNING: Could not save progress: {save_err}")
-
-            else:
-                print("   -> WARNING: No results generated (Empty DataFrame).")
+            # Valutazione (Limita gli utenti se vuoi fare un test veloce, es. limit_users=50)
+            metrics = predictor.evaluate_test_set(limit_users=50)
+            
+            print(f"    [RESULT] MSE: {metrics['mse']:.4f} | MAE: {metrics['mae']:.4f}")
+            
+            phase1_results.append({
+                "Model": conf.name,
+                "MSE": metrics["mse"],
+                "MAE": metrics["mae"]
+            })
+            
+            # Keep Track of Winner
+            if metrics["mse"] < best_mse:
+                best_mse = metrics["mse"]
+                best_config = conf
                 
         except Exception as e:
-            print(f"   -> ERROR in {config.name}: {e}")
+            print(f"    [ERROR] Failed: {e}")
 
-    print(f"\n>>> Experiment Complete. Results saved in {csv_filename} <<<")
+    # Show Phase 1 Leaderboard
+    df_p1 = pd.DataFrame(phase1_results).sort_values("MSE")
+    print(f"\n{'-'*80}")
+    print("PHASE 1 LEADERBOARD (Lower MSE is Better)")
+    print(f"{'-'*80}")
+    print(df_p1.to_string(index=False))
+    
+    if not best_config:
+        print("\nCritical Error: No valid model found. Exiting.")
+        return
+
+    print(f"\n>>> WINNER: {best_config.name} (MSE: {best_mse:.4f})")
+    print(">>> Proceeding to Exploration Phase using the Winner configuration...\n\n")
+
+    # ==============================================================================
+    # FASE 2: EXPLORATION LAB (Precision vs Diversity)
+    # Obiettivo: Usare il modello migliore e variare la Temperatura per esplorare.
+    # ==============================================================================
+    
+    print(f"{'='*80}")
+    print(f"PHASE 2: EXPLORATION LAB (Optimizing User Experience)")
+    print(f"Base Model: {best_config.name}")
+    print(f"{'='*80}\n")
+    
+    # Livelli di Esplorazione (MAB)
+    exploration_levels = [
+        ("Deterministic", 0.01), # Argmax (No Risk)
+        ("Conservative",  0.5),  # Low Risk
+        ("Balanced",      1.0),  # Standard Softmax
+        ("Adventurous",   2.0),  # High Risk
+        ("Chaos",         5.0)   # Pure Randomness
+    ]
+    
+    phase2_results = []
+    
+    for label, temp in exploration_levels:
+        print(f">>> Testing Strategy: {label} (Temp={temp})")
+        
+        # Clona la config vincente e modifica solo la temperatura
+        # Usiamo copy per non modificare l'oggetto originale
+        current_conf = copy.copy(best_config)
+        current_conf.name = f"Winner_{label}"
+        current_conf.temperature = temp
+        current_conf.top_k = 10 # Fissiamo K per consistenza
+        
+        try:
+            predictor = HybridRatingPredictor(current_conf, ratings_path, movies_path)
+            
+            # Valutazione Exploration (Sampling)
+            exp_metrics = predictor.evaluate_exploration(limit_users=50)
+            
+            print(f"    [RESULT] Precision: {exp_metrics['precision']:.4f} | Diversity: {exp_metrics['diversity']:.4f}")
+            
+            phase2_results.append({
+                "Strategy": label,
+                "Temp": temp,
+                "Precision": exp_metrics["precision"],
+                "Diversity": exp_metrics["diversity"],
+                "Novelty": exp_metrics["novelty"]
+            })
+            
+        except Exception as e:
+            print(f"    [ERROR] Failed: {e}")
+
+    # Show Phase 2 Results
+    df_p2 = pd.DataFrame(phase2_results)
+    print(f"\n{'-'*80}")
+    print("PHASE 2 REPORT: TRADE-OFF ANALYSIS")
+    print(f"{'-'*80}")
+    print(df_p2.to_string(index=False))
+    print(f"{'-'*80}")
+    print("NOTE: \n - High Precision = Safe recommendations (boring?)")
+    print(" - High Diversity = Discovering new genres (risky?)")
+    print(" - Look for the 'Sweet Spot' where Diversity jumps up but Precision holds.")
+    print(f"{'='*80}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=["test", "full"], default="full")
-    args = parser.parse_args()
-    run_experiment(args.mode)
+    run_full_experiment()
