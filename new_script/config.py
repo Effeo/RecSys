@@ -20,6 +20,9 @@ class Config:
     # I constraint scores (es. +5.0 award) sono troppo grandi per una scala 1-5.
     # Questo fattore li riduce. Es: 5.0 * 0.1 = +0.5 stelle di bonus.
     constraint_scaler: float = 0.1 
+
+    use_popularity: bool = True
+    popularity_weight: float = 0.5
     
     # --- Pesi Content-Based (User Constraints) ---
     award_weight: float = 5.0      

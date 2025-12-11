@@ -33,13 +33,128 @@ def run_full_experiment():
     print(f"PHASE 1: ACCURACY TOURNAMENT (Finding the Best Predictor)")
     print(f"{'='*80}\n")
     
-    candidates = [
-        Config(name="01_Baseline", alpha_cf=0.0, constraint_scaler=0.0, shrink_term=10),
-        Config(name="02_Pure_SVD", alpha_cf=1.0, constraint_scaler=0.0, svd_components=20),
-        Config(name="03_Pure_Content", alpha_cf=0.0, constraint_scaler=0.2),
-        Config(name="04_Hybrid_Balanced", alpha_cf=0.5, constraint_scaler=0.1, svd_components=20),
-        Config(name="05_Hybrid_CF_Dom", alpha_cf=0.8, constraint_scaler=0.05, svd_components=30),
-    ]
+    # candidates = [
+    #     Config(name="01_Baseline", alpha_cf=0.0, constraint_scaler=0.0, shrink_term=10),
+    #     Config(name="02_Pure_SVD", alpha_cf=1.0, constraint_scaler=0.0, svd_components=20),
+    #     Config(name="03_Pure_Content", alpha_cf=0.0, constraint_scaler=0.2),
+    #     Config(name="04_Hybrid_Balanced", alpha_cf=0.5, constraint_scaler=0.1, svd_components=20),
+    #     Config(name="05_Hybrid_CF_Dom", alpha_cf=0.8, constraint_scaler=0.05, svd_components=30),
+    # ]
+
+    candidates = []
+    
+    # ==============================================================================
+    # GRUPPO 1: HYBRID BALANCE (alpha_cf) - Impatto primario su MSE/MAE
+    # ------------------------------------------------------------------------------
+    # OBIETTIVO: Trovare il bilanciamento tra Collaborative Filtering (CF) e 
+    # Content-Based (CB) che massimizza l'accuratezza.
+    # ==============================================================================
+    candidates.extend([
+        Config(name="G1_PureContent", alpha_cf=0.0),            # 100% Content
+        Config(name="G1_ContentDominant", alpha_cf=0.2),        # 80% Content, 20% CF
+        Config(name="G1_Balanced", alpha_cf=0.5),               # Default
+        Config(name="G1_CFDominant", alpha_cf=0.8),             # 20% Content, 80% CF
+        Config(name="G1_PureCF", alpha_cf=1.0),                 # 100% CF
+        Config(name="G1_ComplexCF", alpha_cf=0.8, svd_components=100), # CF Dominante con maggiore risoluzione SVD
+    ])
+
+    # ==============================================================================
+    # GRUPPO 2: EXPLORATION & DIVERSITY (temperature) - Impatto primario su P/N/D
+    # ------------------------------------------------------------------------------
+    # OBIETTIVO: Variare la 'temperature' della Softmax per controllare il trade-off 
+    # tra Precisione (bassa T) e Novelty/Diversity (alta T).
+    # ==============================================================================
+    base_s = 0.5
+    candidates.extend([
+        Config(name="G2_Deterministic", alpha_cf=base_s, temperature=0.01), # Simula Argmax (Precisione Massima)
+        Config(name="G2_Conservative", alpha_cf=base_s, temperature=0.5),
+        Config(name="G2_Balanced", alpha_cf=base_s, temperature=1.0),   # Default
+        Config(name="G2_Adventurous", alpha_cf=base_s, temperature=2.0),
+        Config(name="G2_Chaos", alpha_cf=base_s, temperature=5.0), # Massima Exploration
+    ])
+
+    # ==============================================================================
+    # GRUPPO 3: POPULARITY BIAS (use_popularity/popularity_weight) - Impatto su MSE/MAE e Novelty
+    # ------------------------------------------------------------------------------
+    # OBIETTIVO: Vedere come l'aggiunta di un bonus ai film popolari influenzi 
+    # l'accuratezza e le metriche di scoperta (Novelty).
+    # ==============================================================================
+    candidates.extend([
+        Config(name="G3_NoBias", alpha_cf=0.3, use_popularity=False),
+        Config(name="G3_Subtle", alpha_cf=0.3, use_popularity=True, popularity_weight=0.5), # Default
+        Config(name="G3_Moderate", alpha_cf=0.3, use_popularity=True, popularity_weight=5.0),
+        Config(name="G3_Strong", alpha_cf=0.3, use_popularity=True, popularity_weight=10.0),
+        Config(name="G3_Dominant", alpha_cf=0.3, use_popularity=True, popularity_weight=20.0),
+    ])
+
+    # ==============================================================================
+    # GRUPPO 4: CONTENT ANATOMY (Pesi Content) - Impatto primario su MSE/MAE
+    # ------------------------------------------------------------------------------
+    # OBIETTIVO: Isolare l'importanza dei singoli metadati (award_weight, director_weight, runtime_weight). 
+    # Alpha_cf basso (0.1) per amplificare l'effetto Content.
+    # ==============================================================================
+    candidates.extend([
+        Config(name="G4_AllEqual", alpha_cf=0.1, award_weight=5.0, director_weight=5.0, runtime_weight=3.0), # Base forte
+        Config(name="G4_DirectorOnly", alpha_cf=0.1, award_weight=0.0, director_weight=10.0, runtime_weight=0.0),
+        Config(name="G4_AwardOnly", alpha_cf=0.1, award_weight=10.0, director_weight=0.0, runtime_weight=0.0),
+        Config(name="G4_RuntimeOnly", alpha_cf=0.1, award_weight=0.0, director_weight=0.0, runtime_weight=10.0),
+        Config(name="G4_NoMeta", alpha_cf=0.1, award_weight=0.0, director_weight=0.0, runtime_weight=0.0), # Content solo sui generi
+    ])
+
+    # ==============================================================================
+    # GRUPPO 5: STRICTNESS (Malus Generi/Runtime) - Impatto primario sul Ranking P/N/D
+    # ------------------------------------------------------------------------------
+    # OBIETTIVO: Testare se l'essere molto severi sui filtri (forbidden_genre_malus, missing_runtime_malus) 
+    # causi liste troppo ristrette o assenti.
+    # ==============================================================================
+    candidates.extend([
+        Config(name="G5_Anarchy", alpha_cf=0.5, forbidden_genre_malus=0.0, missing_runtime_malus=0.0),
+        Config(name="G5_Permissive", alpha_cf=0.5, forbidden_genre_malus=5.0, missing_runtime_malus=0.0), 
+        Config(name="G5_Standard", alpha_cf=0.5, forbidden_genre_malus=50.0, missing_runtime_malus=1.0), # Default
+        Config(name="G5_Strict", alpha_cf=0.5, forbidden_genre_malus=200.0, missing_runtime_malus=10.0),
+        Config(name="G5_Draconian", alpha_cf=0.5, forbidden_genre_malus=1000.0, missing_runtime_malus=100.0),
+    ])
+    
+    # ==============================================================================
+    # GRUPPO 6: RECENCY BIAS (year_below_malus_per_year) - Impatto primario su MSE/MAE
+    # ------------------------------------------------------------------------------
+    # OBIETTIVO: Capire se il bias per i film vecchi migliora l'accuratezza.
+    # ==============================================================================
+    candidates.extend([
+        Config(name="G6_Timeless", alpha_cf=0.5, year_below_malus_per_year=0.0),
+        Config(name="G6_Nostalgic", alpha_cf=0.5, year_below_malus_per_year=0.01),
+        Config(name="G6_Modernist", alpha_cf=0.5, year_below_malus_per_year=0.2),
+        Config(name="G6_NewGen", alpha_cf=0.5, year_below_malus_per_year=0.5),
+    ])
+
+    # ==============================================================================
+    # GRUPPO 7: DATA TRUST (shrink_term) - Impatto primario su MSE/MAE
+    # ------------------------------------------------------------------------------
+    # OBIETTIVO: Testare l'effetto del termine di riduzione sui bias (b_u, b_i) 
+    # per prevenire l'overfitting.
+    # ==============================================================================
+    base_cf_shrink = 0.8
+    candidates.extend([
+        Config(name="G7_Naive", alpha_cf=base_cf_shrink, shrink_term=0),   # Nessuna riduzione
+        Config(name="G7_Optimistic", alpha_cf=base_cf_shrink, shrink_term=2),
+        Config(name="G7_Standard", alpha_cf=base_cf_shrink, shrink_term=10), # Default
+        Config(name="G7_Skeptical", alpha_cf=base_cf_shrink, shrink_term=30),
+        Config(name="G7_Paranoid", alpha_cf=base_cf_shrink, shrink_term=100), # Riduzione estrema
+    ])
+
+    # ==============================================================================
+    # GRUPPO 8: MATRIX RESOLUTION (svd_components) - Impatto primario su MSE/MAE
+    # ------------------------------------------------------------------------------
+    # OBIETTIVO: Trovare la risoluzione ottimale della mappa dei gusti.
+    # ==============================================================================
+    base_cf_svd = 0.8
+    candidates.extend([
+        Config(name="G8_LowRes_5", alpha_cf=base_cf_svd, svd_components=5),
+        Config(name="G8_MidRes_30", alpha_cf=base_cf_svd, svd_components=30), # Default
+        Config(name="G8_HighRes_60", alpha_cf=base_cf_svd, svd_components=60),
+        Config(name="G8_UltraRes_150", alpha_cf=base_cf_svd, svd_components=150),
+        Config(name="G8_ExtremeRes_300", alpha_cf=base_cf_svd, svd_components=300),
+    ])
 
     phase1_results = []
     best_mse = float('inf')

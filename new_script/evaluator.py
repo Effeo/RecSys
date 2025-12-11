@@ -23,6 +23,9 @@ class HybridRatingPredictor:
         self.global_mean = 0.0
         self.user_biases = {}
         self.item_biases = {}
+
+        self.item_pop_log = {} # Variabile d'istanza per il log della popolarità
+        self._calculate_popularity_log()
         
         # Matrici SVD
         self.U = None     # User features
@@ -120,6 +123,15 @@ class HybridRatingPredictor:
         final_rating = baseline + hybrid_residual
         return clip_rating(final_rating)
 
+    def _calculate_popularity_log(self):
+        """Calcola e normalizza il logaritmo della popolarità (conteggio interazioni) di ogni film."""
+        counts = self.ratings["movie_id"].value_counts()
+        pop_log = np.log1p(counts)
+        max_pop = pop_log.max()
+        if max_pop > 0:
+            pop_log = pop_log / max_pop
+        self.item_pop_log = pop_log.to_dict()
+
     def _calculate_single_constraint(self, movie_id: int, prefs: Dict) -> float:
         row = self.movies[self.movies.movie_id == movie_id]
         if row.empty: return 0.0
@@ -154,6 +166,10 @@ class HybridRatingPredictor:
             
         if row["director"] in prefs.get("favorite_directors", []):
             score += self.config.director_weight
+
+        if self.config.use_popularity:
+            pop_score = self.item_pop_log.get(movie_id, 0.0)
+            score += pop_score * self.config.popularity_weight
             
         return score
 
