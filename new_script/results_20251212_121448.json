@@ -1,0 +1,587 @@
+{
+    "timestamp": "20251212_121448",
+    "phase1_accuracy_tournament": [
+        {
+            "Model": "G1_PureContent",
+            "MSE": 2.8041573454168156,
+            "MAE": 1.3457397209733473,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G1_ContentDominant",
+            "MSE": 2.522019325644619,
+            "MAE": 1.2523193970975324,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G1_Balanced",
+            "MSE": 2.111711169876977,
+            "MAE": 1.1197849377861893,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G1_CFDominant",
+            "MSE": 1.1338450340753532,
+            "MAE": 0.8434080801131819,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G1_PureCF",
+            "MSE": 0.8720863086045525,
+            "MAE": 0.726050972825753,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G1_ComplexCF",
+            "MSE": 1.180207678818403,
+            "MAE": 0.8621040168263993,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G2_Deterministic",
+            "MSE": 2.111711169876977,
+            "MAE": 1.1197849377861893,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G2_Conservative",
+            "MSE": 2.111711169876977,
+            "MAE": 1.1197849377861893,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G2_Balanced",
+            "MSE": 2.111711169876977,
+            "MAE": 1.1197849377861893,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G2_Adventurous",
+            "MSE": 2.111711169876977,
+            "MAE": 1.1197849377861893,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G2_Chaos",
+            "MSE": 2.111711169876977,
+            "MAE": 1.1197849377861893,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G3_NoBias",
+            "MSE": 2.4259569438865642,
+            "MAE": 1.2187384670944825,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G3_Subtle",
+            "MSE": 2.403188091386771,
+            "MAE": 1.2097069003285836,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G3_Moderate",
+            "MSE": 2.238088273766696,
+            "MAE": 1.1437422602887544,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G3_Strong",
+            "MSE": 2.140310353661576,
+            "MAE": 1.1005192810414046,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G3_Dominant",
+            "MSE": 2.154743008074961,
+            "MAE": 1.1095277068887006,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G4_AllEqual",
+            "MSE": 2.6558084790336767,
+            "MAE": 1.2978146115407083,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G4_DirectorOnly",
+            "MSE": 2.7472293778173746,
+            "MAE": 1.3302338556136069,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G4_AwardOnly",
+            "MSE": 2.611511515948284,
+            "MAE": 1.2789557990377167,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G4_RuntimeOnly",
+            "MSE": 2.773959197238743,
+            "MAE": 1.3409954429172513,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G4_NoMeta",
+            "MSE": 2.773959197238743,
+            "MAE": 1.3409954429172513,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G5_Anarchy",
+            "MSE": 1.0794618630659591,
+            "MAE": 0.8353220573983449,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G5_Permissive",
+            "MSE": 1.1238553088233587,
+            "MAE": 0.8550592376182641,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G5_Standard",
+            "MSE": 2.111711169876977,
+            "MAE": 1.1197849377861893,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G5_Strict",
+            "MSE": 2.269252625996114,
+            "MAE": 1.1645069555967082,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G5_Draconian",
+            "MSE": 3.9401689396841926,
+            "MAE": 1.588074942990326,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G6_Timeless",
+            "MSE": 2.111711169876977,
+            "MAE": 1.1197849377861893,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G6_Nostalgic",
+            "MSE": 2.111711169876977,
+            "MAE": 1.1197849377861893,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G6_Modernist",
+            "MSE": 2.111711169876977,
+            "MAE": 1.1197849377861893,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G6_NewGen",
+            "MSE": 2.111711169876977,
+            "MAE": 1.1197849377861893,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G7_Naive",
+            "MSE": 1.1548112631210363,
+            "MAE": 0.8537101376987554,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G7_Optimistic",
+            "MSE": 1.1414262515214546,
+            "MAE": 0.8467023369825624,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G7_Standard",
+            "MSE": 1.1338450340753532,
+            "MAE": 0.8434080801131819,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G7_Skeptical",
+            "MSE": 1.1337010068594557,
+            "MAE": 0.8453311116980896,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G7_Paranoid",
+            "MSE": 1.1498048864632184,
+            "MAE": 0.859082642911353,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G8_LowRes_5",
+            "MSE": 1.1449388165073933,
+            "MAE": 0.8502780966144948,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G8_MidRes_30",
+            "MSE": 1.1497174991775658,
+            "MAE": 0.8498216206348216,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G8_HighRes_60",
+            "MSE": 1.1637582534477597,
+            "MAE": 0.855652941154046,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G8_UltraRes_150",
+            "MSE": 1.1742950562383039,
+            "MAE": 0.859471848084435,
+            "n_samples": 1901
+        },
+        {
+            "Model": "G8_ExtremeRes_300",
+            "MSE": 1.1803785047435644,
+            "MAE": 0.8634927580752355,
+            "n_samples": 1901
+        }
+    ],
+    "winning_config": {
+        "name": "G1_PureCF",
+        "alpha_cf": 1.0,
+        "svd_components": 20,
+        "shrink_term": 10,
+        "constraint_scaler": 0.1,
+        "use_popularity": true,
+        "popularity_weight": 0.5,
+        "award_weight": 5.0,
+        "director_weight": 5.0,
+        "runtime_weight": 3.0,
+        "runtime_outside_malus": 5.0,
+        "missing_runtime_malus": 1.0,
+        "forbidden_genre_malus": 50.0,
+        "missing_year_malus": 0.1,
+        "year_below_malus_per_year": 0.05,
+        "temperature": 1.0,
+        "random_seed": 42,
+        "verbose_users": 0
+    },
+    "phase2_exploration_lab": [
+        {
+            "base_model": "G1_PureCF",
+            "strategy": "Deterministic",
+            "temperature": 0.01,
+            "precision": 0.47600000000000003,
+            "diversity": 0.5377777777777777,
+            "novelty": 9.043518770865505
+        },
+        {
+            "base_model": "G1_PureCF",
+            "strategy": "Conservative",
+            "temperature": 0.5,
+            "precision": 0.298,
+            "diversity": 0.5333333333333333,
+            "novelty": 10.980751293370213
+        },
+        {
+            "base_model": "G1_PureCF",
+            "strategy": "Balanced",
+            "temperature": 1.0,
+            "precision": 0.236,
+            "diversity": 0.5222222222222223,
+            "novelty": 11.365855601414582
+        },
+        {
+            "base_model": "G1_PureCF",
+            "strategy": "Adventurous",
+            "temperature": 2.0,
+            "precision": 0.198,
+            "diversity": 0.5455555555555556,
+            "novelty": 11.37360454175565
+        },
+        {
+            "base_model": "G1_PureCF",
+            "strategy": "Chaos",
+            "temperature": 5.0,
+            "precision": 0.22,
+            "diversity": 0.5022222222222222,
+            "novelty": 11.679828768983363
+        },
+        {
+            "base_model": "G2_Deterministic",
+            "strategy": "Deterministic",
+            "temperature": 0.01,
+            "precision": 0.37999999999999995,
+            "diversity": 0.4955555555555556,
+            "novelty": 9.91492877250718
+        },
+        {
+            "base_model": "G2_Deterministic",
+            "strategy": "Conservative",
+            "temperature": 0.5,
+            "precision": 0.274,
+            "diversity": 0.49111111111111116,
+            "novelty": 11.273075535370191
+        },
+        {
+            "base_model": "G2_Deterministic",
+            "strategy": "Balanced",
+            "temperature": 1.0,
+            "precision": 0.22599999999999998,
+            "diversity": 0.4733333333333334,
+            "novelty": 11.57035049453814
+        },
+        {
+            "base_model": "G2_Deterministic",
+            "strategy": "Adventurous",
+            "temperature": 2.0,
+            "precision": 0.21400000000000002,
+            "diversity": 0.4777777777777778,
+            "novelty": 11.643173663117278
+        },
+        {
+            "base_model": "G2_Deterministic",
+            "strategy": "Chaos",
+            "temperature": 5.0,
+            "precision": 0.17600000000000002,
+            "diversity": 0.4866666666666667,
+            "novelty": 11.747388504986631
+        },
+        {
+            "base_model": "G3_Strong",
+            "strategy": "Deterministic",
+            "temperature": 0.01,
+            "precision": 0.402,
+            "diversity": 0.5455555555555556,
+            "novelty": 9.453306328282464
+        },
+        {
+            "base_model": "G3_Strong",
+            "strategy": "Conservative",
+            "temperature": 0.5,
+            "precision": 0.31200000000000006,
+            "diversity": 0.4788888888888889,
+            "novelty": 10.539184889916724
+        },
+        {
+            "base_model": "G3_Strong",
+            "strategy": "Balanced",
+            "temperature": 1.0,
+            "precision": 0.29,
+            "diversity": 0.4777777777777778,
+            "novelty": 11.062513449161013
+        },
+        {
+            "base_model": "G3_Strong",
+            "strategy": "Adventurous",
+            "temperature": 2.0,
+            "precision": 0.2,
+            "diversity": 0.4888888888888889,
+            "novelty": 11.570489354448316
+        },
+        {
+            "base_model": "G3_Strong",
+            "strategy": "Chaos",
+            "temperature": 5.0,
+            "precision": 0.19400000000000003,
+            "diversity": 0.5244444444444444,
+            "novelty": 11.481554109783731
+        },
+        {
+            "base_model": "G4_AwardOnly",
+            "strategy": "Deterministic",
+            "temperature": 0.01,
+            "precision": 0.37,
+            "diversity": 0.5022222222222222,
+            "novelty": 9.842247532531921
+        },
+        {
+            "base_model": "G4_AwardOnly",
+            "strategy": "Conservative",
+            "temperature": 0.5,
+            "precision": 0.248,
+            "diversity": 0.47555555555555556,
+            "novelty": 11.304693489423618
+        },
+        {
+            "base_model": "G4_AwardOnly",
+            "strategy": "Balanced",
+            "temperature": 1.0,
+            "precision": 0.24600000000000002,
+            "diversity": 0.49888888888888877,
+            "novelty": 11.330328740522408
+        },
+        {
+            "base_model": "G4_AwardOnly",
+            "strategy": "Adventurous",
+            "temperature": 2.0,
+            "precision": 0.19,
+            "diversity": 0.4522222222222222,
+            "novelty": 11.501770029070292
+        },
+        {
+            "base_model": "G4_AwardOnly",
+            "strategy": "Chaos",
+            "temperature": 5.0,
+            "precision": 0.21600000000000003,
+            "diversity": 0.5022222222222221,
+            "novelty": 11.73282597352691
+        },
+        {
+            "base_model": "G5_Anarchy",
+            "strategy": "Deterministic",
+            "temperature": 0.01,
+            "precision": 0.424,
+            "diversity": 0.5511111111111111,
+            "novelty": 9.710705705522997
+        },
+        {
+            "base_model": "G5_Anarchy",
+            "strategy": "Conservative",
+            "temperature": 0.5,
+            "precision": 0.308,
+            "diversity": 0.5399999999999999,
+            "novelty": 10.983616200066356
+        },
+        {
+            "base_model": "G5_Anarchy",
+            "strategy": "Balanced",
+            "temperature": 1.0,
+            "precision": 0.22,
+            "diversity": 0.5022222222222222,
+            "novelty": 11.578311308576206
+        },
+        {
+            "base_model": "G5_Anarchy",
+            "strategy": "Adventurous",
+            "temperature": 2.0,
+            "precision": 0.212,
+            "diversity": 0.49666666666666665,
+            "novelty": 11.52378809370692
+        },
+        {
+            "base_model": "G5_Anarchy",
+            "strategy": "Chaos",
+            "temperature": 5.0,
+            "precision": 0.228,
+            "diversity": 0.48222222222222216,
+            "novelty": 11.644106120734053
+        },
+        {
+            "base_model": "G6_Timeless",
+            "strategy": "Deterministic",
+            "temperature": 0.01,
+            "precision": 0.37400000000000005,
+            "diversity": 0.4722222222222222,
+            "novelty": 9.888855206637363
+        },
+        {
+            "base_model": "G6_Timeless",
+            "strategy": "Conservative",
+            "temperature": 0.5,
+            "precision": 0.264,
+            "diversity": 0.4733333333333333,
+            "novelty": 11.268690191311407
+        },
+        {
+            "base_model": "G6_Timeless",
+            "strategy": "Balanced",
+            "temperature": 1.0,
+            "precision": 0.21800000000000005,
+            "diversity": 0.46777777777777774,
+            "novelty": 11.551679816579615
+        },
+        {
+            "base_model": "G6_Timeless",
+            "strategy": "Adventurous",
+            "temperature": 2.0,
+            "precision": 0.20600000000000002,
+            "diversity": 0.4944444444444445,
+            "novelty": 11.461377401392335
+        },
+        {
+            "base_model": "G6_Timeless",
+            "strategy": "Chaos",
+            "temperature": 5.0,
+            "precision": 0.19599999999999998,
+            "diversity": 0.4788888888888889,
+            "novelty": 11.57553344820509
+        },
+        {
+            "base_model": "G7_Skeptical",
+            "strategy": "Deterministic",
+            "temperature": 0.01,
+            "precision": 0.44799999999999995,
+            "diversity": 0.4933333333333334,
+            "novelty": 9.317055019336784
+        },
+        {
+            "base_model": "G7_Skeptical",
+            "strategy": "Conservative",
+            "temperature": 0.5,
+            "precision": 0.26600000000000007,
+            "diversity": 0.4922222222222221,
+            "novelty": 11.036949351124969
+        },
+        {
+            "base_model": "G7_Skeptical",
+            "strategy": "Balanced",
+            "temperature": 1.0,
+            "precision": 0.226,
+            "diversity": 0.5022222222222222,
+            "novelty": 11.537270825910621
+        },
+        {
+            "base_model": "G7_Skeptical",
+            "strategy": "Adventurous",
+            "temperature": 2.0,
+            "precision": 0.226,
+            "diversity": 0.49333333333333335,
+            "novelty": 11.608402091487541
+        },
+        {
+            "base_model": "G7_Skeptical",
+            "strategy": "Chaos",
+            "temperature": 5.0,
+            "precision": 0.15,
+            "diversity": 0.5111111111111112,
+            "novelty": 11.822204459166976
+        },
+        {
+            "base_model": "G8_LowRes_5",
+            "strategy": "Deterministic",
+            "temperature": 0.01,
+            "precision": 0.41600000000000004,
+            "diversity": 0.4888888888888889,
+            "novelty": 9.414037746366718
+        },
+        {
+            "base_model": "G8_LowRes_5",
+            "strategy": "Conservative",
+            "temperature": 0.5,
+            "precision": 0.274,
+            "diversity": 0.46888888888888886,
+            "novelty": 11.108107228406707
+        },
+        {
+            "base_model": "G8_LowRes_5",
+            "strategy": "Balanced",
+            "temperature": 1.0,
+            "precision": 0.27,
+            "diversity": 0.48999999999999994,
+            "novelty": 11.29658705741315
+        },
+        {
+            "base_model": "G8_LowRes_5",
+            "strategy": "Adventurous",
+            "temperature": 2.0,
+            "precision": 0.21000000000000005,
+            "diversity": 0.4877777777777778,
+            "novelty": 11.669423464973342
+        },
+        {
+            "base_model": "G8_LowRes_5",
+            "strategy": "Chaos",
+            "temperature": 5.0,
+            "precision": 0.19,
+            "diversity": 0.5155555555555555,
+            "novelty": 11.734818383811536
+        }
+    ]
+}

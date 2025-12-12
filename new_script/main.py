@@ -211,12 +211,45 @@ def run_full_experiment():
     print(">>> Proceeding to Exploration Phase using the Winner configuration...\n\n")
 
     # ==============================================================================
+    # NUOVA LOGICA: IDENTIFICAZIONE VINCITORI DI GRUPPO
+    # ==============================================================================
+    
+    # Converti in DataFrame per facilitare il raggruppamento e l'estrazione
+    df_p1 = pd.DataFrame(phase1_results)
+    
+    # Estrai il prefisso del gruppo (es. "G1", "G2", ecc.)
+    df_p1["Group"] = df_p1["Model"].str.extract(r"^(G\d+)_")
+    
+    # Trova l'indice del modello con il minimo MSE per ogni gruppo
+    idx_min_mse_per_group = df_p1.groupby("Group")["MSE"].idxmin()
+    
+    # Filtra il DataFrame per ottenere solo i risultati dei vincitori di gruppo
+    group_winners_df = df_p1.loc[idx_min_mse_per_group]
+    
+    # Mappa i nomi dei modelli vincitori alle loro configurazioni originali
+    # (per fare ciò, dobbiamo passare da phase1_results a candidates)
+    group_winner_names = group_winners_df["Model"].tolist()
+    
+    group_winner_configs = []
+    for conf in candidates:
+        if conf.name in group_winner_names:
+            group_winner_configs.append(conf)
+            
+    print(f"\n{'-'*80}")
+    print(f"VINCITORI DI GRUPPO IDENTIFICATI PER LA FASE 2:")
+    for conf in group_winner_configs:
+        mse_val = group_winners_df[group_winners_df['Model'] == conf.name]['MSE'].iloc[0]
+        print(f"* {conf.name} (MSE: {mse_val:.4f})")
+    print(f"{'-'*80}")
+
+    print(">>> Procedendo al Laboratorio di Esplorazione con i Vincitori di Gruppo...\n\n")
+
+    # ==============================================================================
     # FASE 2: EXPLORATION LAB
     # ==============================================================================
     
     print(f"{'='*80}")
-    print(f"PHASE 2: EXPLORATION LAB (Optimizing User Experience)")
-    print(f"Base Model: {best_config.name}")
+    print(f"PHASE 2: EXPLORATION LAB (Optimizing User Experience for each Group Winner)")
     print(f"{'='*80}\n")
     
     exploration_levels = [
@@ -229,40 +262,50 @@ def run_full_experiment():
     
     phase2_results = []
     
-    for label, temp in exploration_levels:
-        print(f">>> Testing Strategy: {label} (Temp={temp})")
+    # CICLO AGGIUNTO: Itera su ogni configurazione vincente per gruppo
+    for base_conf in group_winner_configs:
         
-        current_conf = copy.copy(best_config)
-        current_conf.name = f"Winner_{label}"
-        current_conf.temperature = temp
-        current_conf.top_k = 10 
+        print(f"\n--- TESTING BASE MODEL: {base_conf.name} ---")
         
-        try:
-            predictor = HybridRatingPredictor(current_conf, ratings_path, movies_path)
+        for label, temp in exploration_levels:
+            print(f">>> Testing Strategy: {label} (Temp={temp})")
             
-            exp_metrics = predictor.evaluate_exploration(limit_users=50)
+            # NOTA IMPORTANTE: Si parte da una COPIA del modello base (il vincitore di gruppo)
+            current_conf = copy.copy(base_conf)
+            current_conf.name = f"{base_conf.name}_{label}"
+            current_conf.temperature = temp
+            current_conf.top_k = 10 
             
-            print(f"    [RESULT] Prec: {exp_metrics['precision']:.4f} | Div: {exp_metrics['diversity']:.4f} | Nov: {exp_metrics['novelty']:.2f}")
-            
-            phase2_results.append({
-                "strategy": label,
-                "temperature": temp,
-                "precision": float(exp_metrics["precision"]),
-                "diversity": float(exp_metrics["diversity"]),
-                "novelty": float(exp_metrics["novelty"])
-            })
-            
-        except Exception as e:
-            print(f"    [ERROR] Failed: {e}")
+            try:
+                predictor = HybridRatingPredictor(current_conf, ratings_path, movies_path)
+                
+                # Ho rimesso limit_users=50 per velocità, rimuovilo per il test completo
+                exp_metrics = predictor.evaluate_exploration(limit_users=50) 
+                
+                print(f"    [RESULT] Prec: {exp_metrics['precision']:.4f} | Div: {exp_metrics['diversity']:.4f} | Nov: {exp_metrics['novelty']:.2f}")
+                
+                phase2_results.append({
+                    "base_model": base_conf.name, # Aggiunge il nome del modello base per l'analisi
+                    "strategy": label,
+                    "temperature": temp,
+                    "precision": float(exp_metrics["precision"]),
+                    "diversity": float(exp_metrics["diversity"]),
+                    "novelty": float(exp_metrics["novelty"])
+                })
+                
+            except Exception as e:
+                print(f"    [ERROR] Failed: {e}")
 
     full_experiment_data["phase2_exploration_lab"] = phase2_results
 
     if phase2_results:
+        # Si usa 'base_model' per raggruppare i risultati nella stampa
         df_p2 = pd.DataFrame(phase2_results)
+        df_p2_styled = df_p2.sort_values(by=["base_model", "temperature"]).to_string(index=False)
         print(f"\n{'-'*80}")
-        print("PHASE 2 REPORT: TRADE-OFF ANALYSIS")
+        print("PHASE 2 REPORT: TRADE-OFF ANALYSIS (Per Vincitore di Gruppo)")
         print(f"{'-'*80}")
-        print(df_p2.to_string(index=False))
+        print(df_p2_styled)
     
     # ==============================================================================
     # SALVATAGGIO SU FILE JSON
